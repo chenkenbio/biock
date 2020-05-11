@@ -31,8 +31,21 @@ def model_summary(model):
     total_param = 0
     trainable_param = 0
     for p in model.parameters():
-        num_p = len(p)
+        num_p = 1
+        for n in p.shape:
+            num_p *= n
         if p.requires_grad:
             trainable_param += num_p
         total_param += num_p
     return {'total_param': total_param, 'trainable_param': trainable_param}
+
+## Demo model for test
+class Demo(nn.Module):
+    def __init__(self, in_channel=4, seq_len=50):
+        super(Demo, self).__init__()
+        self.cnn = nn.Conv1d(in_channel, 8, 3, padding=1)
+        self.fc = nn.Linear(seq_len * 8, 1)
+    def forward(self, seq):
+        seq = torch.relu(self.cnn(seq))
+        seq = torch.sigmoid(self.fc(seq))
+        return seq
