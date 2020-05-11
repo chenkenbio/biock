@@ -4,8 +4,7 @@ import argparse, os, sys, warnings, time, json, gzip, logging
 import numpy as np
 import subprocess
 from subprocess import Popen, PIPE
-
-
+from sklearn.metrics import precision_recall_curve, roc_auc_score, roc_curve, precision_recall_curve, auc
 
 
 ### logs
@@ -56,7 +55,7 @@ def run_bash(cmd):
     return (rc, out, err)
 
 
-## model summary
+## deep learning related
 def model_summary(model):
     """
     model: pytorch model
@@ -72,6 +71,16 @@ def model_summary(model):
         total_param += num_p
     return {'total_param': total_param, 'trainable_param': trainable_param}
 
+
+## evaluation
+def aupr_score(true, prob):
+    true, prob = np.array(true), np.array(prob)
+    assert len(true.shape) == 1 or min(true.shape) == 1
+    assert len(prob.shape) == 1 or min(prob.shape) == 1
+    true, prob = true.reshape(-1), prob.reshape(-1)
+    precision, recall, thresholds = precision_recall_curve(true, prob)
+    aupr = auc(recall, precision)
+    return aupr
 
 
 ## constants & variables
