@@ -5,6 +5,9 @@ import numpy as np
 import subprocess
 from subprocess import Popen, PIPE
 from sklearn.metrics import precision_recall_curve, roc_auc_score, roc_curve, precision_recall_curve, auc
+import functools
+
+print = functools.partial(print, flush=True)
 
 
 ### logs
