@@ -9,6 +9,14 @@ import functools
 
 print = functools.partial(print, flush=True)
 
+### misc
+def str2num(s):
+    """ ideas from HuangBi """
+    try:
+        n = int(s)
+    except:
+        n = float(s)
+    return n
 
 ### logs
 def print_run_info(args=None):
