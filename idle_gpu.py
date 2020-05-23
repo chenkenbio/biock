@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import random, time
+import random, time, os
 from subprocess import Popen, PIPE
 
 
@@ -9,7 +9,7 @@ def idle_gpu(n=1, min_memory=4096, time_step=60 * 1, time_out=3600 * 16):
     p = Popen(['/bin/bash', '-c', "nvidia-smi | grep GeForce | wc -l"], stdout=PIPE, stderr=PIPE)
     out, err = p.communicate()
     n_GPUs = int(out)
-    random.seed(time.time())
+    random.seed(time.time() % os.getpid())
     rand_priority = [random.random() for x in range(n_GPUs)]
     rand_priority[0] += 1
     while elaspsed_time < time_out:
