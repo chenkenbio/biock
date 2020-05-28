@@ -18,6 +18,20 @@ def str2num(s):
         n = float(s)
     return n
 
+def overlap(x1, x2, y1, y2):
+    """ [x1, x2), [y1, y2) """
+    length = 0
+    x1, x2, y1, y2 = int(x1), int(x2), int(y1), int(y2)
+    if x2 <= y1:
+        length = x2 - y1
+    elif x1 <= y2:
+        length = min(x2, y2) - max(x1, y1)
+    else:
+        length = y2 - x1
+    return length
+
+
+
 ### logs
 def print_run_info(args=None):
     print("\n# PROG: '{}' started at {}".format(os.path.basename(sys.argv[0]), time.asctime()))
