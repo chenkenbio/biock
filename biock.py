@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import argparse, os, sys, warnings, time, json, gzip, logging
+import argparse, os, sys, warnings, time, json, gzip, logging, warnings
 import numpy as np
 import subprocess
 from subprocess import Popen, PIPE
@@ -18,7 +18,7 @@ def str2num(s):
         n = float(s)
     return n
 
-def overlap(x1, x2, y1, y2):
+def overlap_length(x1, x2, y1, y2):
     """ [x1, x2), [y1, y2) """
     length = 0
     x1, x2, y1, y2 = int(x1), int(x2), int(y1), int(y2)
@@ -30,6 +30,10 @@ def overlap(x1, x2, y1, y2):
         length = y2 - x1
     return length
 
+#TODO: deprecate in the future
+def overlap(x1, x2, y1, y2):
+    warnings.warn("`overlap` should be replaced with `overlap_length`!")
+    return overlap_length(x1, x2, y1, y2)
 
 
 ### logs
@@ -135,15 +139,32 @@ def aupr_score(true, prob):
 
 
 ## constants & variables
-hg19_chromsize = {"chr1": 249250621, "chr10": 135534747, "chr11": 135006516, 
-        "chr12": 133851895, "chr13": 115169878, "chr14": 107349540, 
-        "chr15": 102531392, "chr16": 90354753, "chr17": 81195210, 
-        "chr18": 78077248, "chr19": 59128983, "chr2": 243199373, 
-        "chr20": 63025520, "chr21": 48129895, "chr22": 51304566, 
-        "chr3": 198022430, "chr4": 191154276, "chr5": 180915260, 
-        "chr6": 171115067, "chr7": 159138663, "chr8": 146364022, 
-        "chr9": 141213431, "chrM": 16569, "chrMT": 16569,
-        "chrX": 155270560, "chrY": 59373566}
+hg19_chromsize = {"chr1": 249250621, "chr2": 243199373, 
+        "chr3": 198022430, "chr4": 191154276, 
+        "chr5": 180915260, "chr6": 171115067, 
+        "chr7": 159138663, "chr8": 146364022, 
+        "chr9": 141213431, "chr10": 135534747, 
+        "chr11": 135006516, "chr12": 133851895, 
+        "chr13": 115169878, "chr14": 107349540, 
+        "chr15": 102531392, "chr16": 90354753, 
+        "chr17": 81195210, "chr18": 78077248, 
+        "chr19": 59128983, "chr20": 63025520, 
+        "chr21": 48129895, "chr22": 51304566, 
+        "chrX": 155270560, "chrY": 59373566,
+        "chrM": 16569, "chrMT": 16569}
+
+nt_onehot_dict = {
+        'A': np.array([1, 0, 0, 0]), 'a': np.array([1, 0, 0, 0]),
+        'C': np.array([0, 1, 0, 0]), 'c': np.array([0, 1, 0, 0]),
+        'G': np.array([0, 0, 1, 0]), 'g': np.array([0, 0, 1, 0]),
+        'T': np.array([0, 0, 0, 1]), 't': np.array([0, 0, 0, 1]),
+        'U': np.array([0, 0, 0, 1]), 'u': np.array([0, 0, 0, 1]),
+        'W': np.array([0.5, 0, 0, 0.5]),
+        'S': np.array([0, 0.5, 0.5, 0]),
+        'N': np.array([0.25, 0.25, 0.25, 0.25]),
+        'n': np.array([0.25, 0.25, 0.25, 0.25]), 
+        ';': np.array([0, 0, 0, 0])
+}
 
 
 if __name__ == "__main__":
