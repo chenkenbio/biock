@@ -49,3 +49,9 @@ class Demo(nn.Module):
         seq = torch.relu(self.cnn(seq))
         seq = torch.sigmoid(self.fc(seq))
         return seq
+    def freeze_CNN(self):
+        for p in self.cnn.parameters():
+            p.requires_grad = False
+    def unfreze_CNN(self):
+        for p in self.cnn.parameters():
+            p.requires_grad = True

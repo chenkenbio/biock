@@ -37,8 +37,9 @@ def idle_gpu(n=1, min_memory=4096, time_step=60 * 1, time_out=3600 * 16):
         else:
             break
 
-    return ','.join(ans[0][0:n])
+    #return ','.join(ans[0][0])
+    return ','.join([ans[i][0] for i in range(n)])
 
 if __name__ == "__main__":
-    ans = idle_gpu()
+    ans = idle_gpu(n=4)
     print(ans)

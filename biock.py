@@ -30,6 +30,13 @@ def overlap_length(x1, x2, y1, y2):
         length = y2 - x1
     return length
 
+def label_count(labels):
+    """ labels should be list,np.array """
+    categories, counts = np.unique(labels, return_counts=True)
+    counts = (counts / counts.sum()).round(3)
+    return list(zip(categories, counts))
+
+
 #TODO: deprecate in the future
 def overlap(x1, x2, y1, y2):
     warnings.warn("`overlap` should be replaced with `overlap_length`!")
