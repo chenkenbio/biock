@@ -33,8 +33,8 @@ def overlap_length(x1, x2, y1, y2):
 def label_count(labels):
     """ labels should be list,np.array """
     categories, counts = np.unique(labels, return_counts=True)
-    counts = (counts / counts.sum()).round(3)
-    return list(zip(categories, counts))
+    ratio = (counts / counts.sum()).round(3)
+    return list(zip(categories, counts, ratio))
 
 
 #TODO: deprecate in the future
