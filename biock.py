@@ -8,6 +8,7 @@ from sklearn.metrics import precision_recall_curve, roc_auc_score, roc_curve, pr
 import functools
 
 print = functools.partial(print, flush=True)
+print_err = functools.partial(print, flush=True, file=sys.stderr)
 
 ### misc
 def str2num(s):
@@ -44,12 +45,12 @@ def overlap(x1, x2, y1, y2):
 
 
 ### logs
-def print_run_info(args=None):
-    print("\n# PROG: '{}' started at {}".format(os.path.basename(sys.argv[0]), time.asctime()))
-    print("## PWD: %s" % os.getcwd())
-    print("## CMD: %s" % ' '.join(sys.argv))
+def print_run_info(args=None, out=sys.stdout):
+    print("\n# PROG: '{}' started at {}".format(os.path.basename(sys.argv[0]), time.asctime()), file=out)
+    print("## PWD: %s" % os.getcwd(), file=out)
+    print("## CMD: %s" % ' '.join(sys.argv), file=out)
     if args is not None:
-        print("## ARG: {}".format(args))
+        print("## ARG: {}".format(args), file=out)
 
 def prog_header(args=None, out=sys.stdout):
     print("\n# Started at {}".format(time.asctime()))
@@ -143,6 +144,36 @@ def aupr_score(true, prob):
     precision, recall, thresholds = precision_recall_curve(true, prob)
     aupr = auc(recall, precision)
     return aupr
+
+class BasicBED(object):
+    def __init__(self, input_file, bin_size=50000):
+        self.input_file = input_file
+        self.chroms = dict()
+        self.bin_size = bin_size
+        #self.parse_input()
+
+    def intersect(self, chrom, start, end, gap=0):
+        start, end = int(start) - gap, int(end) + gap
+        assert start <= end
+        res = set()
+        if chrom in self.chroms:
+            for idx in range(start // self.bin_size, (end - 1) // self.bin_size + 1):
+                if idx not in self.chroms[chrom]:
+                    continue
+                try:
+                    for i_start, i_end, attr in self.chroms[chrom][idx]:
+                        if i_start >= end or i_end <= start:
+                            continue
+                        res.add((i_start, i_end, attr))
+                except:
+                    print(self.chroms[chrom][idx])
+                    exit(1)
+        return res
+    def parse_input(self):
+        raise NotImplementedError
+        # record format: (left, right, (XXX))
+        # XXX: self defined attributes of interval [left, right)
+
 
 
 ## constants & variables
