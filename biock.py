@@ -169,6 +169,16 @@ class BasicBED(object):
                     print(self.chroms[chrom][idx])
                     exit(1)
         return res
+
+    def sort(self, merge=False):
+        for chrom in self.chroms:
+            for idx in self.chroms[chrom]:
+                self.chroms[chrom][idx] = \
+                        sorted(self.chroms[chrom][idx], key=lambda l:(l[0], l[1]))
+
+    def __str__(self):
+        return "BasicBED(filename:{})".format(os.path.relpath(self.input_file))
+
     def parse_input(self):
         raise NotImplementedError
         # record format: (left, right, (XXX))
