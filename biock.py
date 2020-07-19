@@ -31,6 +31,11 @@ def overlap_length(x1, x2, y1, y2):
         length = y2 - x1
     return length
 
+def distance(x1, x2, y1, y2):
+    """ interval distance """
+    d = overlap_length(x1, x2, y1, y2)
+    return -d
+
 def label_count(labels):
     """ labels should be list,np.array """
     categories, counts = np.unique(labels, return_counts=True)
@@ -154,7 +159,8 @@ class BasicBED(object):
 
     def intersect(self, chrom, start, end, gap=0):
         start, end = int(start) - gap, int(end) + gap
-        assert start <= end
+        if start >= end:
+            warnings.warn("starat >= end: start={}, end={}".format(start, end))
         res = set()
         if chrom in self.chroms:
             for idx in range(start // self.bin_size, (end - 1) // self.bin_size + 1):
@@ -168,6 +174,7 @@ class BasicBED(object):
                 except:
                     print(self.chroms[chrom][idx])
                     exit(1)
+        res = sorted(list(res), key=lambda l:(l[0], l[1]))
         return res
 
     def sort(self, merge=False):
@@ -175,6 +182,18 @@ class BasicBED(object):
             for idx in self.chroms[chrom]:
                 self.chroms[chrom][idx] = \
                         sorted(self.chroms[chrom][idx], key=lambda l:(l[0], l[1]))
+
+    def add_record(self, chrom, start, end, attrs=None, cut=False):
+        if chrom not in self.chroms:
+            self.chroms[chrom] = dict()
+        for bin_idx in range(start // self.bin_size, (end - 1) // self.bin_size + 1):
+            if bin_idx not in self.chroms[chrom]:
+                self.chroms[chrom][bin_idx] = list()
+            if cut:
+                raise NotImplementedError
+            else:
+                self.chroms[chrom][bin_idx].append((start, end, attrs))
+
 
     def __str__(self):
         return "BasicBED(filename:{})".format(os.path.relpath(self.input_file))
