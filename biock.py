@@ -203,6 +203,13 @@ class BasicBED(object):
         # record format: (left, right, (XXX))
         # XXX: self defined attributes of interval [left, right)
 
+def array_summary(x):
+    x = np.array(x)
+    r = [np.mean(x), min(x)]
+    for q in [0.25, 0.5, 0.75]:
+        r.append(np.quantile(x, q))
+    r.append(max(x))
+    return np.array(r).round(2)
 
 
 ## constants & variables
