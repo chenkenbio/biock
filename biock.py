@@ -8,6 +8,7 @@ from sklearn.metrics import precision_recall_curve, roc_auc_score, roc_curve, pr
 import functools
 
 print = functools.partial(print, flush=True)
+print_err = functools.partial(print, flush=True, file=sys.stderr)
 
 ### misc
 def str2num(s):
@@ -30,6 +31,11 @@ def overlap_length(x1, x2, y1, y2):
         length = y2 - x1
     return length
 
+def distance(x1, x2, y1, y2):
+    """ interval distance """
+    d = overlap_length(x1, x2, y1, y2)
+    return -d
+
 def label_count(labels):
     """ labels should be list,np.array """
     categories, counts = np.unique(labels, return_counts=True)
@@ -44,12 +50,12 @@ def overlap(x1, x2, y1, y2):
 
 
 ### logs
-def print_run_info(args=None):
-    print("\n# PROG: '{}' started at {}".format(os.path.basename(sys.argv[0]), time.asctime()))
-    print("## PWD: %s" % os.getcwd())
-    print("## CMD: %s" % ' '.join(sys.argv))
+def print_run_info(args=None, out=sys.stdout):
+    print("\n# PROG: '{}' started at {}".format(os.path.basename(sys.argv[0]), time.asctime()), file=out)
+    print("## PWD: %s" % os.getcwd(), file=out)
+    print("## CMD: %s" % ' '.join(sys.argv), file=out)
     if args is not None:
-        print("## ARG: {}".format(args))
+        print("## ARG: {}".format(args), file=out)
 
 def prog_header(args=None, out=sys.stdout):
     print("\n# Started at {}".format(time.asctime()))
@@ -143,6 +149,67 @@ def aupr_score(true, prob):
     precision, recall, thresholds = precision_recall_curve(true, prob)
     aupr = auc(recall, precision)
     return aupr
+
+class BasicBED(object):
+    def __init__(self, input_file, bin_size=50000):
+        self.input_file = input_file
+        self.chroms = dict()
+        self.bin_size = bin_size
+        #self.parse_input()
+
+    def intersect(self, chrom, start, end, gap=0):
+        start, end = int(start) - gap, int(end) + gap
+        if start >= end:
+            warnings.warn("starat >= end: start={}, end={}".format(start, end))
+        res = set()
+        if chrom in self.chroms:
+            for idx in range(start // self.bin_size, (end - 1) // self.bin_size + 1):
+                if idx not in self.chroms[chrom]:
+                    continue
+                try:
+                    for i_start, i_end, attr in self.chroms[chrom][idx]:
+                        if i_start >= end or i_end <= start:
+                            continue
+                        res.add((i_start, i_end, attr))
+                except:
+                    print(self.chroms[chrom][idx])
+                    exit(1)
+        res = sorted(list(res), key=lambda l:(l[0], l[1]))
+        return res
+
+    def sort(self, merge=False):
+        for chrom in self.chroms:
+            for idx in self.chroms[chrom]:
+                self.chroms[chrom][idx] = \
+                        sorted(self.chroms[chrom][idx], key=lambda l:(l[0], l[1]))
+
+    def add_record(self, chrom, start, end, attrs=None, cut=False):
+        if chrom not in self.chroms:
+            self.chroms[chrom] = dict()
+        for bin_idx in range(start // self.bin_size, (end - 1) // self.bin_size + 1):
+            if bin_idx not in self.chroms[chrom]:
+                self.chroms[chrom][bin_idx] = list()
+            if cut:
+                raise NotImplementedError
+            else:
+                self.chroms[chrom][bin_idx].append((start, end, attrs))
+
+
+    def __str__(self):
+        return "BasicBED(filename:{})".format(os.path.relpath(self.input_file))
+
+    def parse_input(self):
+        raise NotImplementedError
+        # record format: (left, right, (XXX))
+        # XXX: self defined attributes of interval [left, right)
+
+def array_summary(x):
+    x = np.array(x)
+    r = [np.mean(x), min(x)]
+    for q in [0.25, 0.5, 0.75]:
+        r.append(np.quantile(x, q))
+    r.append(max(x))
+    return np.array(r).round(2)
 
 
 ## constants & variables
