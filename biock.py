@@ -226,6 +226,7 @@ hg19_chromsize = {"chr1": 249250621, "chr2": 243199373,
         "chr21": 48129895, "chr22": 51304566, 
         "chrX": 155270560, "chrY": 59373566,
         "chrM": 16569, "chrMT": 16569}
+chrom_size = {'hg19': hg19_chromsize, 'GRCh37': hg19_chromsize}
 
 nt_onehot_dict = {
         'A': np.array([1, 0, 0, 0]), 'a': np.array([1, 0, 0, 0]),
