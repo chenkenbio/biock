@@ -23,6 +23,7 @@ def label_count(labels):
 def get_args():
     p = argparse.ArgumentParser()
     p.add_argument('file')
+    p.add_argument('-f', '--f1-cutoff', default=None, type=float)
     p.add_argument('--roc', action='store_true')
     p.add_argument('--aupr', action='store_true')
     p.add_argument('--pos', type=int, default=1)
@@ -51,3 +52,8 @@ if __name__ == "__main__":
     print("- AUC:  {:.5f}".format(AUC))
     print("- AUPR: {:.5f}".format(AUPR))
     print("- AP:   {:.5f}".format(AP))
+    if args.f1_cutoff is not None:
+        pos = (score > args.f1_cutoff).astype(int)
+        F1 = f1_score(label, pos)
+        print("- F1:   {:.5f}".format(F1))
+
