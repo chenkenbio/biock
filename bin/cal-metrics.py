@@ -19,6 +19,37 @@ def label_count(labels):
     ratio = (counts / counts.sum()).round(3)
     return list(zip(categories, counts, ratio))
 
+def average_FDR_FOR(y_true, y_prob):
+    N = len(y_true)
+    y_true, y_prob = np.array(y_true).astype(int), np.array(y_prob) 
+    cutoffs = np.linspace(min(y_prob) + 1E-6, max(y_prob) - 1E-6, 1000)
+    fdr_sum = 0
+    for_sum = 0
+    for c in cutoffs:
+        pred = (y_prob >= c).astype(int)
+        FDR = np.logical_and(y_true == 0, pred == 1).sum() / np.sum(pred)
+        FOR = np.logical_and(y_true == 1, pred == 0).sum() / (N - np.sum(pred))
+        fdr_sum += FDR
+        for_sum += FOR
+    return fdr_sum / N, for_sum / N
+
+def min_FDR_FOR(y_true, y_prob):
+    N = len(y_true)
+    y_true, y_prob = np.array(y_true).astype(int), np.array(y_prob) 
+    cutoffs = np.linspace(min(y_prob) + 1E-6, max(y_prob) - 1E-6, 1000)
+    min_fdr = 10
+    min_for = 10
+    for c in cutoffs:
+        pred = (y_prob >= c).astype(int)
+        FDR = np.logical_and(y_true == 0, pred == 1).sum() / np.sum(pred)
+        FOR = np.logical_and(y_true == 1, pred == 0).sum() / (N - np.sum(pred))
+        if FDR < min_fdr:
+            min_fdr = FDR
+        if FOR < min_for:
+            min_for = FOR
+    return min_fdr, min_for
+
+
 
 def get_args():
     p = argparse.ArgumentParser()
@@ -56,4 +87,10 @@ if __name__ == "__main__":
         pos = (score > args.f1_cutoff).astype(int)
         F1 = f1_score(label, pos)
         print("- F1:   {:.5f}".format(F1))
+    mean_FDR, mean_FOR = average_FDR_FOR(label, score)
+    print("- Average FDR: {:.5f}".format(mean_FDR))
+    print("- Average FOR: {:.5f}".format(mean_FOR))
+    min_FDR, min_FOR= min_FDR_FOR(label, score)
+    print("- Average FDR: {:.5f}".format(min_FDR))
+    print("- Average FOR: {:.5f}".format(min_FOR))
 
