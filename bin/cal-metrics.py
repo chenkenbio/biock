@@ -84,13 +84,15 @@ if __name__ == "__main__":
     print("- AUPR: {:.5f}".format(AUPR))
     print("- AP:   {:.5f}".format(AP))
     if args.f1_cutoff is not None:
-        pos = (score > args.f1_cutoff).astype(int)
-        F1 = f1_score(label, pos)
+        pred = (score > args.f1_cutoff).astype(int)
+        F1 = f1_score(label, pred)
         print("- F1:   {:.5f}".format(F1))
-    mean_FDR, mean_FOR = average_FDR_FOR(label, score)
-    print("- Average FDR: {:.5f}".format(mean_FDR))
-    print("- Average FOR: {:.5f}".format(mean_FOR))
-    min_FDR, min_FOR= min_FDR_FOR(label, score)
-    print("- Average FDR: {:.5f}".format(min_FDR))
-    print("- Average FOR: {:.5f}".format(min_FOR))
+        FDR = np.logical_and(label == 0, pred == 1).sum() / np.sum(pred)
+        FOR = np.logical_and(label == 1, pred == 0).sum() / (N - np.sum(pred))
+        print("- FDR:  {:.5f}".format(FDR))
+        print("- FOR:  {:.5f}".format(FOR))
+
+    #mean_FDR, mean_FOR = average_FDR_FOR(label, score)
+    #print("- Average FDR: {:.5f}".format(mean_FDR))
+    #print("- Average FOR: {:.5f}".format(mean_FOR))
 
