@@ -49,6 +49,17 @@ def min_FDR_FOR(y_true, y_prob):
             min_for = FOR
     return min_fdr, min_for
 
+def max_f1(y_true, y_prob):
+    max_f1 = -1
+    best_cutoff = None
+    for cutoff in np.linspace(min(y_prob) + 1E-6, max(y_prob) - 1E-6, 100):
+        pred = (y_prob >= cutoff).astype(int)
+        f1 = f1_score(y_true, pred)
+        if f1 > max_f1:
+            best_cutoff = cutoff
+            max_f1 = f1
+    return max_f1, best_cutoff
+            
 
 
 def get_args():
@@ -83,15 +94,20 @@ if __name__ == "__main__":
     print("- AUC:  {:.5f}".format(AUC))
     print("- AUPR: {:.5f}".format(AUPR))
     print("- AP:   {:.5f}".format(AP))
-    if args.f1_cutoff is not None:
-        pred = (score > args.f1_cutoff).astype(int)
-        N = len(pred)
-        F1 = f1_score(label, pred)
-        print("- F1:   {:.5f}".format(F1))
-        FDR = np.logical_and(label == 0, pred == 1).sum() / np.sum(pred)
-        FOR = np.logical_and(label == 1, pred == 0).sum() / (N - np.sum(pred))
-        print("- FDR:  {:.5f}".format(FDR))
-        print("- FOR:  {:.5f}".format(FOR))
+    if args.f1_cutoff is None:
+        F1, cutoff = max_f1(label, score)
+        args.f1_cutoff = cutoff
+        print("F1 cutoff (max F1): {}".format(args.f1_cutoff))
+    else:
+        print("F1 cutoff (pre-defined): {}".format(args.f1_cutoff))
+    pred = (score > args.f1_cutoff).astype(int)
+    N = len(pred)
+    F1 = f1_score(label, pred)
+    print("- F1:   {:.5f}".format(F1))
+    FDR = np.logical_and(label == 0, pred == 1).sum() / np.sum(pred)
+    FOR = np.logical_and(label == 1, pred == 0).sum() / (N - np.sum(pred))
+    print("- FDR:  {:.5f}".format(FDR))
+    print("- FOR:  {:.5f}".format(FOR))
 
     #mean_FDR, mean_FOR = average_FDR_FOR(label, score)
     #print("- Average FDR: {:.5f}".format(mean_FDR))
