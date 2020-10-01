@@ -85,6 +85,7 @@ if __name__ == "__main__":
     print("- AP:   {:.5f}".format(AP))
     if args.f1_cutoff is not None:
         pred = (score > args.f1_cutoff).astype(int)
+        N = len(pred)
         F1 = f1_score(label, pred)
         print("- F1:   {:.5f}".format(F1))
         FDR = np.logical_and(label == 0, pred == 1).sum() / np.sum(pred)
