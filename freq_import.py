@@ -6,3 +6,4 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import pearsonr, spearmanr
 import pickle
+import biock.biock as biock

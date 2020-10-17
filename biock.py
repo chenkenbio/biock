@@ -205,11 +205,11 @@ class BasicBED(object):
 
 def array_summary(x):
     x = np.array(x)
-    r = [np.mean(x), min(x)]
-    for q in [0.25, 0.5, 0.75]:
-        r.append(np.quantile(x, q))
-    r.append(max(x))
-    return np.array(r).round(2)
+    r = {'mean': np.mean(x).round(3), 'min': np.round(min(x), 3)}
+    for q in [0.1, 0.25, 0.5, 0.75, 0.9]:
+        r[q] = np.quantile(x, q).round(3)
+    r['max'] = np.round(max(x), 3)
+    return r
 
 
 ## constants & variables
