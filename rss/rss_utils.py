@@ -44,18 +44,18 @@ def parse_oup(base_url="https://academic.oup.com/NAR/advance-articles", n_pages=
             doi = item.find('div', class_='al-citation-list').a.text
             if doi not in articles:
                 articles[doi] = Article(title=title, link=url, doi=doi, pub_date=date, authors=authors)
-    print("  {} articles fetched. {}".format(len(articles), time.asctime()), file=sys.stderr, flush=True)
+    print("  {} articles fetched. {}\n\n".format(len(articles), time.asctime()), file=sys.stderr, flush=True)
     return articles
 
-def generate_bioinfo(out=sys.stderr):
+def generate_bioinfo(title="Bioinformatics Advance Access", out=sys.stderr):
     articles = parse_oup(base_url="https://academic.oup.com/bioinformatics/advance-articles", n_pages=4)
     print('<rss xmlns:prism="http://purl.org/rss/1.0/modules/prism/" version="2.0">', file=out)
     print('  <channel>', file=out)
-    print('    <title>Bioinformatics Advance Access</title>', file=out)
+    print('    <title>{}</title>'.format(title), file=out)
     print('    <link>http://academic.oup.com/bioinformatics</link>', file=out)
     print('    <description> </description>', file=out)
     print('    <language>en-us</language>', file=out)
-    print('    <pubDate>{}</pubDate>'.format(time.asctime()), file=out)
+    print('    <pubDate>{}</pubDate>'.format(articles[next(iter(articles))].pub_date), file=out)
     print('    <lastBuildDate>{}</lastBuildDate>'.format(time.asctime()), file=out)
     print('    <generator>Chen Ken</generator>', file=out)
     for item in articles:
@@ -64,15 +64,15 @@ def generate_bioinfo(out=sys.stderr):
     print('</rss>', file=out)
 
 
-def generate_nar(out=sys.stderr):
+def generate_nar(title="Nucleic Acids Research Advance Access", out=sys.stderr):
     articles = parse_oup(base_url="https://academic.oup.com/NAR/advance-articles", n_pages=2)
     print('<rss xmlns:prism="http://purl.org/rss/1.0/modules/prism/" version="2.0">', file=out)
     print('  <channel>', file=out)
-    print('    <title>Nucleic Acids Research Advance Access</title>', file=out)
+    print('    <title>{}</title>'.format(title), file=out)
     print('    <link>http://academic.oup.com/nar</link>', file=out)
     print('    <description> </description>', file=out)
     print('    <language>en-us</language>', file=out)
-    print('    <pubDate>{}</pubDate>'.format(time.asctime()), file=out)
+    print('    <pubDate>{}</pubDate>'.format(articles[next(iter(articles))].pub_date), file=out)
     print('    <lastBuildDate>{}</lastBuildDate>'.format(time.asctime()), file=out)
     print('    <generator>Chen Ken</generator>', file=out)
     for item in articles:
