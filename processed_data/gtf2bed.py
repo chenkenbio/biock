@@ -4,6 +4,7 @@ import argparse, os, sys, warnings, time, json
 #from biock.biock import run_bash
 #import biock.biock as biock 
 
+
 def parse_gtf_attr(attrs, category='gencode'):
     kv = dict()
     if category == 'gencode':
@@ -21,6 +22,11 @@ def get_args():
 
 if __name__ == "__main__":
     args = get_args()
+
+    if args.gtf.endswith("gz"):
+        import gzip
+        from functools import partial
+        open = partial(gzip.open, mode='rt')
     with open(args.gtf) as infile:
         for l in infile:
             if l.startswith('#'):
