@@ -40,6 +40,13 @@ def idle_gpu(n=1, min_memory=4096, time_step=60 * 1, time_out=3600 * 16):
     #return ','.join(ans[0][0])
     return ','.join([ans[i][0] for i in range(n)])
 
+def set_GPU(n_gpu=1, min_memory=5120, quiet=False):
+    gpu_ids = idle_gpu(n=n_gpu, min_memory=min_memory)
+    if not quiet:
+        print("- Using GPU: {}".format(gpu_ids))
+    os.environ['CUDA_VISIBLE_DEVICES'] = gpu_ids
+
+
 if __name__ == "__main__":
     ans = idle_gpu(n=4)
     print(ans)
