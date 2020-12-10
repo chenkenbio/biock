@@ -44,5 +44,5 @@ if __name__ == "__main__":
                 tss = int(end) - 1
             else:
                 tss = int(start)
-            print("{}\t{}\t{}\t{}|{}|{}|{}\t.\t{}".format(chrom, tss, tss + 1, gene_id, gene_name, gene_type, tx_id, strand))
+            print("{}\t{}\t{}\t{}|{}|{}|{}|{}|{}\t.\t{}".format(chrom, tss, tss + 1, gene_id, gene_name, gene_type, tx_id, tss, strand, strand))
 
