@@ -13,7 +13,7 @@ def idle_gpu(n=1, min_memory=4096, time_step=60 * 1, time_out=3600 * 16):
     rand_priority = [random.random() for x in range(n_GPUs)]
     rand_priority[0] += 1
     while elaspsed_time < time_out:
-        cmd = "nvidia-smi | grep 250W | awk '{print NR-1,$9,$11,$13,$3}' | sed 's/MiB//g;s/%//g;s/C//g'"
+        cmd = "nvidia-smi | grep Default | awk '{print NR-1,$9,$11,$13,$3}' | sed 's/MiB//g;s/%//g;s/C//g'"
         p = Popen(['/bin/bash', '-c', cmd], stdout=PIPE, stderr=PIPE)
         out, err = p.communicate()
         query_result, err = out.decode('utf8'), err.decode('utf8')

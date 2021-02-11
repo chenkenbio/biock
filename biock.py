@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import argparse, os, sys, warnings, time, json, gzip, logging, warnings
+import argparse, os, sys, warnings, time, json, gzip, logging, warnings, pickle
 import numpy as np
 import subprocess
 from subprocess import Popen, PIPE
@@ -10,6 +10,7 @@ import functools
 print = functools.partial(print, flush=True)
 print_err = functools.partial(print, flush=True, file=sys.stderr)
 
+
 ### misc
 def str2num(s):
     """ ideas from HuangBi """
@@ -18,6 +19,9 @@ def str2num(s):
     except:
         n = float(s)
     return n
+
+
+
 
 def overlap_length(x1, x2, y1, y2):
     """ [x1, x2), [y1, y2) """
@@ -203,6 +207,37 @@ class BasicBED(object):
         # record format: (left, right, (XXX))
         # XXX: self defined attributes of interval [left, right)
 
+
+class BasicFasta(object):
+    def __init__(self, fasta):
+        self.fasta = os.path.realpath(fasta)
+        self.cache = self.fasta + ".pkl.gz"
+        self.id2seq = dict()
+        self.load_fasta()
+        self.num_seqs = len(self.id2seq)
+
+    def extract_seq_id(self, header):
+        raise NotImplementedError
+
+    def load_fasta(self):
+        seq = str()
+        if os.path.exists(self.cache):
+            self.id2seq = pickle.load(gzip.open(self.cache, 'rb'))
+        else:
+            open_file = gzip.open if self.fasta.endswith('gz') else open
+            with open_file(self.fasta, 'rt') as infile:
+                for l in infile:
+                    if l.startswith('>'):
+                        if len(seq) > 0:
+                            self.id2seq[seq_id] = seq
+                            seq = str()
+                        seq_id = self.extract_seq_id(l)
+                    else:
+                        seq += l.strip()
+                self.id2seq[seq_id] = seq
+            pickle.dump(self.id2seq, gzip.open(self.cache, 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
+
+
 def array_summary(x):
     x = np.array(x)
     r = {'mean': np.mean(x).round(3), 'min': np.round(min(x), 3)}
@@ -253,6 +288,8 @@ nt_onehot_dict = {
         'n': np.array([0.25, 0.25, 0.25, 0.25]), 
         ';': np.array([0, 0, 0, 0])
 }
+
+
 
 
 if __name__ == "__main__":
