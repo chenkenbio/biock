@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Convert csv file to tsv file"""
 
-import os, csv, argparse
+import os, csv, argparse, gzip
+from functools import partial
 
 def get_args():
     parser = argparse.ArgumentParser(description=\
@@ -22,7 +23,11 @@ if __name__ == "__main__":
             exit("ERROR: \'" + f + "\' is not regular file")
     
     for f in args.csv:
-        with open(f) as infile:
+        if f.endswith('gz'):
+            custom_open = partial(gzip.open, mode='rt')
+        else:
+            custom_open = open
+        with custom_open(f) as infile:
             if args.to_file:
                 with open(f.rstrip('.csv') + '.tsv', 'w') as outfile:
                     csvin = csv.reader(infile)
