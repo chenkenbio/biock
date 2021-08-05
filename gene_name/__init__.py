@@ -6,6 +6,9 @@ import logging
 NCBI_GENE_NAME: dict = json.load(open(os.path.join(os.path.dirname(__file__), "NCBI_gene2symbol.json")))
 ncbi_gene_name = NCBI_GENE_NAME
 
+NCBI_GENE_ID: dict = json.load(open(os.path.join(os.path.dirname(__file__), "NCBI_gene2id.json")))
+NCBI_GENE_ENTREZ = NCBI_GENE_ID
+
 def to_std_gene_name(name, report=False):
     # status: (True, ambiguous, missing)
     if name in NCBI_GENE_NAME:

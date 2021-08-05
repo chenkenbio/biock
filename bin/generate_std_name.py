@@ -1,0 +1,1 @@
+/home/chenken/biock/biock/gene_name/generate_std_name.py
