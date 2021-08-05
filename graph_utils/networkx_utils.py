@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import dgl, torch
 import networkx as nx
 from collections import defaultdict, OrderedDict
 
@@ -56,4 +57,35 @@ def load_graph_as_networkx_5_colums(links, add_self_loop: bool, link_columns=5):
         id_mapping["id2node"][i] = n
 
     return graph, id_mapping
+
+
+def networkx2dgl(nx_graph: nx.MultiDiGraph, 
+        node2id: Dict[str, int], 
+        node2type: Dict[str, str], 
+        etype2id: Dict[str, int], 
+        node_type_range: Dict[str, list],
+        **kwargs) -> dgl.DGLHeteroGraph:
+    hetero_edges = dict()
+    node2id_ = {t: dict() for t in node_type_range}
+    for n, i in node2id.items():
+        t = node2type[n]
+        nid = node2id[n] - node_type_range[t][0]
+        node2id_[t][n] = nid
+    node2id = node2id_
+    for a, b, r in nx_graph.edges:
+        etype = nx_graph[a][b][r]["etype"]
+        ta, tb = node2type[a], node2type[b]
+        rel_type = (ta, etype, tb)
+        if rel_type not in hetero_edges:
+            hetero_edges[rel_type] = [list(), list()]
+        hetero_edges[rel_type][0].append(node2id[ta][a])
+        hetero_edges[rel_type][1].append(node2id[tb][b])
+    for rel_type in hetero_edges:
+        src, dst = hetero_edges[rel_type]
+        hetero_edges[rel_type] = (torch.as_tensor(src, dtype=torch.long), torch.as_tensor(dst, dtype=torch.long))
+    id2node = {t: dict() for t in node2id}
+    for t in node2id:
+        id2node[t] = {i: n for n, i in node2id[t].items()}
+    return dgl.heterograph(hetero_edges), node2id, id2node
+
 
