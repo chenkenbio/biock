@@ -3,8 +3,9 @@
 import dgl, torch
 import networkx as nx
 from collections import defaultdict, OrderedDict
+from typing import Any, Dict, List, Union
 
-def load_graph_as_networkx(links, add_self_loop: bool, link_columns=5):
+def load_graph_as_networkx(links, add_self_loop: bool, link_columns=5) -> [nx.MultiDiGraph, Dict[str, Any]]:
     if link_columns == 5:
         return load_graph_as_networkx_5_colums(links, add_self_loop)
 

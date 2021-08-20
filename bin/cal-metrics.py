@@ -6,6 +6,7 @@ import numpy as np
 from sklearn.metrics import roc_auc_score, precision_recall_curve, auc, precision_score, recall_score, matthews_corrcoef, f1_score, average_precision_score, matthews_corrcoef
 from scipy.stats import pearsonr, spearmanr
 
+from functools import partial
 
 def cal_aupr(y_true, y_prob):
     precision, recall, thresholds = precision_recall_curve(y_true, y_prob)
@@ -77,6 +78,7 @@ def get_args():
     p = argparse.ArgumentParser()
     p.add_argument('file')
     p.add_argument('-f', '--f1-cutoff', default=None, type=float)
+    p.add_argument('-r', action='store_true')
     p.add_argument('--roc', action='store_true')
     p.add_argument('--aupr', action='store_true')
     p.add_argument('--pos', type=int, default=1)
@@ -88,15 +90,24 @@ if __name__ == "__main__":
     args = get_args()
 
     label, score = list(), list()
-    with open(args.file) as infile:
+
+    if args.file.endswith("gz"):
+        custom_open = partial(gzip.open, mode='rt')
+    else:
+        custom_open = partial(open, mode='rt')
+    with custom_open(args.file) as infile:
         for l in infile:
             if l.startswith('#') or len(l.strip()) == 0:
                 continue
             l, s = l.strip().split()[0:2]
-            label.append(int(l))
+            label.append(float(l))
             score.append(float(s))
     label = np.array(label)
     score = np.array(score)
+    if len(np.unique(label)) > 2:
+        label, score = score, label
+    if args.r:
+        score = -score
 
     label_score = zip(list(score), list(label))
     label_score = sorted(label_score, key=lambda l:l[0], reverse=True)

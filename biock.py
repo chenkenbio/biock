@@ -12,6 +12,16 @@ print_err = functools.partial(print, flush=True, file=sys.stderr)
 
 
 ### misc
+def md5_file(fn):
+    import hashlib
+    return hashlib.md5(open(fn, 'rb').read()).hexdigest()
+
+
+def hash_string(s):
+    import hashlib
+    return hashlib.sha256(s.encode()).hexdigest()
+
+
 def str2num(s):
     """ ideas from HuangBi """
     try:
@@ -21,6 +31,9 @@ def str2num(s):
     return n
 
 
+def jaccard_sim(a, b):
+    a, b = set(a), set(b)
+    return len(a.intersection(b)) / len(a.union(b))
 
 
 def overlap_length(x1, x2, y1, y2):
@@ -45,6 +58,24 @@ def label_count(labels):
     categories, counts = np.unique(labels, return_counts=True)
     ratio = (counts / counts.sum()).round(3)
     return list(zip(categories, counts, ratio))
+
+
+def split_train_valid_test(groups, train_keys, valid_keys, test_keys=None):
+    """
+    groups: length N, the number of samples
+    train
+    """
+    assert isinstance(train_keys, list)
+    assert isinstance(valid_keys, list)
+    assert test_keys is None or isinstance(test_keys, list)
+    index = np.arange(len(groups))
+    train_idx = index[np.isin(groups, train_keys)]
+    valid_idx = index[np.isin(groups, valid_keys)]
+    if test_keys is not None:
+        test_idx = index[np.isin(groups, test_keys)]
+        return train_idx, valid_idx, test_idx
+    else:
+        return train_idx, valid_idx
 
 
 #TODO: deprecate in the future
@@ -188,6 +219,7 @@ class BasicBED(object):
                         sorted(self.chroms[chrom][idx], key=lambda l:(l[0], l[1]))
 
     def add_record(self, chrom, start, end, attrs=None, cut=False):
+        start, end = int(start), int(end)
         if chrom not in self.chroms:
             self.chroms[chrom] = dict()
         for bin_idx in range(start // self.bin_size, (end - 1) // self.bin_size + 1):
@@ -204,6 +236,14 @@ class BasicBED(object):
 
     def parse_input(self):
         raise NotImplementedError
+        ## demo
+        # with open(self.input_file) as infile:
+        #     for l in infile:
+        #         if l.startswith("#"):
+        #             continue
+        #         fields = l.strip('\n').split('\t')
+        #         chrom, start, end = fields[0:3]
+        #         self.add_record(chrom, start, end, attrs=fields[3:])
         # record format: (left, right, (XXX))
         # XXX: self defined attributes of interval [left, right)
 
