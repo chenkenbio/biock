@@ -23,12 +23,17 @@ def hash_string(s):
 
 
 def str2num(s):
-    """ ideas from HuangBi """
     try:
         n = int(s)
     except:
         n = float(s)
     return n
+
+def custom_open(fn):
+    if fn.endswith(".gz"):
+        return gzip.open(fn, 'rt')
+    else:
+        return open(fn, 'r')
 
 
 def jaccard_sim(a, b):

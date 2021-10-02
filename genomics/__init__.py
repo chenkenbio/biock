@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+import os
+
+HOME = os.environ["HOME"]
+
 HG19_CHROMSIZE = {"chr1": 249250621, "chr2": 243199373, 
         "chr3": 198022430, "chr4": 191154276, 
         "chr5": 180915260, "chr6": 171115067, 
@@ -28,3 +32,7 @@ HG38_CHROMSIZE = {"chr1": 248956422, "chr2": 242193529,
         "chrM": 16569, "chrMT": 16569}
 CHROM_SIZE_DICT = {'hg19': HG19_CHROMSIZE, 'GRCh37': HG19_CHROMSIZE, "hg38": HG38_CHROMSIZE, "GRCh38": HG38_CHROMSIZE}
 
+
+HG19_FASTA = os.path.join(HOME, "db/gencode/GRCh37/GRCh37.primary_assembly.genome.fa")
+HG38_FASTA = os.path.join(HOME, "db/gencode/GRCh38/GRCh38.primary_assembly.genome.fa")
+FASTA_DICT = {'hg19': HG19_FASTA, 'GRCh37': HG19_FASTA, 'hg38': HG38_FASTA, 'GRCh38': HG38_FASTA}
