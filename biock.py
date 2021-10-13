@@ -29,11 +29,11 @@ def str2num(s):
         n = float(s)
     return n
 
-def custom_open(fn):
+def custom_open(fn, mode='rt'):
     if fn.endswith(".gz"):
-        return gzip.open(fn, 'rt')
+        return gzip.open(fn, mode=mode)
     else:
-        return open(fn, 'r')
+        return open(fn, mode=mode)
 
 
 def jaccard_sim(a, b):
@@ -258,13 +258,13 @@ class BasicFasta(object):
         self.fasta = os.path.realpath(fasta)
         self.cache = self.fasta + ".pkl.gz"
         self.id2seq = dict()
-        self.load_fasta()
+        self.__load_fasta()
         self.num_seqs = len(self.id2seq)
 
     def extract_seq_id(self, header):
         raise NotImplementedError
 
-    def load_fasta(self):
+    def __load_fasta(self):
         seq = str()
         if os.path.exists(self.cache):
             self.id2seq = pickle.load(gzip.open(self.cache, 'rb'))
@@ -281,6 +281,23 @@ class BasicFasta(object):
                         seq += l.strip()
                 self.id2seq[seq_id] = seq
             pickle.dump(self.id2seq, gzip.open(self.cache, 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
+
+def load_fasta(fn):
+    fasta = dict()
+    name, seq = None, list()
+    with custom_open(fn) as infile:
+        for l in infile:
+            if l.startswith('>'):
+                if name is not None:
+                    # print("{}\n{}".format(name, ''.join(seq)))
+                    fasta[name] = ''.join(seq)
+                name = l.strip().lstrip('>')
+                seq = list()
+            else:
+                seq.append(l.strip())
+
+    fasta[name] = ''.join(seq)
+    return fasta
 
 
 def array_summary(x):

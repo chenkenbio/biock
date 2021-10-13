@@ -36,3 +36,5 @@ CHROM_SIZE_DICT = {'hg19': HG19_CHROMSIZE, 'GRCh37': HG19_CHROMSIZE, "hg38": HG3
 HG19_FASTA = os.path.join(HOME, "db/gencode/GRCh37/GRCh37.primary_assembly.genome.fa")
 HG38_FASTA = os.path.join(HOME, "db/gencode/GRCh38/GRCh38.primary_assembly.genome.fa")
 FASTA_DICT = {'hg19': HG19_FASTA, 'GRCh37': HG19_FASTA, 'hg38': HG38_FASTA, 'GRCh38': HG38_FASTA}
+
+from .transcripts import load_transcripts, Transcript, AnnotatedTranscript
