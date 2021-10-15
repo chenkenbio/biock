@@ -23,6 +23,7 @@ def hash_string(s):
 
 
 def str2num(s):
+    s = s.strip()
     try:
         n = int(s)
     except:
