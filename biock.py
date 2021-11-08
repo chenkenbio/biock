@@ -2,13 +2,18 @@
 
 import argparse, os, sys, warnings, time, json, gzip, logging, warnings, pickle
 import numpy as np
+from io import TextIOWrapper
 import subprocess
 from subprocess import Popen, PIPE
-from sklearn.metrics import precision_recall_curve, roc_auc_score, roc_curve, precision_recall_curve, auc
+from typing import Any, Dict, List, Text, TextIO, Union
 import functools
 
 print = functools.partial(print, flush=True)
 print_err = functools.partial(print, flush=True, file=sys.stderr)
+
+FILE_DIR = os.path.dirname(os.path.realpath(__file__))
+# if os.path.exists(os.path.join(FILE_DIR, "variables.py")):
+from .variables import *
 
 
 ### misc
@@ -22,7 +27,7 @@ def hash_string(s):
     return hashlib.sha256(s.encode()).hexdigest()
 
 
-def str2num(s):
+def str2num(s: str) -> Union[int, float]:
     s = s.strip()
     try:
         n = int(s)
@@ -30,11 +35,18 @@ def str2num(s):
         n = float(s)
     return n
 
-def custom_open(fn, mode='rt'):
+def copen(fn: str, mode='rt') -> TextIOWrapper:
     if fn.endswith(".gz"):
         return gzip.open(fn, mode=mode)
     else:
         return open(fn, mode=mode)
+custom_open = copen
+
+def remove_ENS_version(ensembl_id: str) -> str:
+    suffix = ""
+    if ensembl_id.endswith("_PAR_Y"):
+        suffix = "_PAR_Y"
+    return "{}{}".format(ensembl_id.split('.')[0], suffix)
 
 
 def jaccard_sim(a, b):
@@ -181,15 +193,6 @@ def model_summary(model):
     return {'total_param': total_param, 'trainable_param': trainable_param}
 
 
-## evaluation
-def aupr_score(true, prob):
-    true, prob = np.array(true), np.array(prob)
-    assert len(true.shape) == 1 or min(true.shape) == 1
-    assert len(prob.shape) == 1 or min(prob.shape) == 1
-    true, prob = true.reshape(-1), prob.reshape(-1)
-    precision, recall, thresholds = precision_recall_curve(true, prob)
-    aupr = auc(recall, precision)
-    return aupr
 
 class BasicBED(object):
     def __init__(self, input_file, bin_size=50000):
