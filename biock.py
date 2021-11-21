@@ -104,7 +104,7 @@ def overlap(x1, x2, y1, y2):
 
 
 def pandas_df2dict(fn, delimiter='\t', **kwargs):
-    import pandas
+    import pandas as pd
     kwargs["delimiter"] = delimiter
     df = pd.read_csv(fn, **kwargs)
     d = dict()
