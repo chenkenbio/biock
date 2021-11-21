@@ -42,11 +42,12 @@ def copen(fn: str, mode='rt') -> TextIOWrapper:
         return open(fn, mode=mode)
 custom_open = copen
 
-def remove_ENS_version(ensembl_id: str) -> str:
+def strip_ENS_version(ensembl_id: str) -> str:
     suffix = ""
     if ensembl_id.endswith("_PAR_Y"):
         suffix = "_PAR_Y"
     return "{}{}".format(ensembl_id.split('.')[0], suffix)
+remove_ENS_version = strip_ENS_version
 
 
 def jaccard_sim(a, b):
@@ -100,6 +101,17 @@ def split_train_valid_test(groups, train_keys, valid_keys, test_keys=None):
 def overlap(x1, x2, y1, y2):
     warnings.warn("`overlap` should be replaced with `overlap_length`!")
     return overlap_length(x1, x2, y1, y2)
+
+
+def pandas_df2dict(fn, delimiter='\t', **kwargs):
+    import pandas
+    kwargs["delimiter"] = delimiter
+    df = pd.read_csv(fn, **kwargs)
+    d = dict()
+    for k in df.columns:
+        d[k] = np.array(df[k])
+    return d[k]
+
 
 
 ### logs
