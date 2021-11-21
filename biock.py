@@ -110,7 +110,7 @@ def pandas_df2dict(fn, delimiter='\t', **kwargs):
     d = dict()
     for k in df.columns:
         d[k] = np.array(df[k])
-    return d[k]
+    return d
 
 
 
