@@ -38,3 +38,5 @@ HG38_FASTA = os.path.join(HOME, "db/gencode/GRCh38/GRCh38.primary_assembly.genom
 FASTA_DICT = {'hg19': HG19_FASTA, 'GRCh37': HG19_FASTA, 'hg38': HG38_FASTA, 'GRCh38': HG38_FASTA}
 
 from .transcripts import load_transcripts, Transcript, AnnotatedTranscript
+
+from .toolbox import onehot_dna_rna

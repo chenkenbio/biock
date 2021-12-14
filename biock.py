@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse, os, sys, warnings, time, json, gzip, logging, warnings, pickle
+import random, string
 import numpy as np
 from io import TextIOWrapper
 import subprocess
@@ -35,12 +36,14 @@ def str2num(s: str) -> Union[int, float]:
         n = float(s)
     return n
 
+
 def copen(fn: str, mode='rt') -> TextIOWrapper:
     if fn.endswith(".gz"):
         return gzip.open(fn, mode=mode)
     else:
         return open(fn, mode=mode)
 custom_open = copen
+
 
 def strip_ENS_version(ensembl_id: str) -> str:
     suffix = ""
@@ -79,6 +82,15 @@ def label_count(labels):
     return list(zip(categories, counts, ratio))
 
 
+def split_chrom_start_end(chrom_start_end):
+    """
+    deal with chrom:start-end format
+    """
+    chrom, start_end = chrom_start_end.split(':')
+    start, end = start_end.split('-')
+    return chrom, int(start), int(end)
+
+
 def split_train_valid_test(groups, train_keys, valid_keys, test_keys=None):
     """
     groups: length N, the number of samples
@@ -97,10 +109,10 @@ def split_train_valid_test(groups, train_keys, valid_keys, test_keys=None):
         return train_idx, valid_idx
 
 
-#TODO: deprecate in the future
-def overlap(x1, x2, y1, y2):
-    warnings.warn("`overlap` should be replaced with `overlap_length`!")
-    return overlap_length(x1, x2, y1, y2)
+# #TODO: deprecate in the future
+# def overlap(x1, x2, y1, y2):
+#     warnings.warn("`overlap` should be replaced with `overlap_length`!")
+#     return overlap_length(x1, x2, y1, y2)
 
 
 def pandas_df2dict(fn, delimiter='\t', **kwargs):
@@ -324,6 +336,9 @@ def array_summary(x):
     r['max'] = np.round(max(x), 3)
     return r
 
+def random_string(n):
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=n))
+
 
 ## constants & variables
 hg19_chromsize = {"chr1": 249250621, "chr2": 243199373, 
@@ -355,16 +370,15 @@ hg38_chromsize = {"chr1": 248956422, "chr2": 242193529,
 chrom_size = {'hg19': hg19_chromsize, 'GRCh37': hg19_chromsize, "hg38": hg38_chromsize, "GRCh38": hg38_chromsize}
 
 nt_onehot_dict = {
-        'A': np.array([1, 0, 0, 0]), 'a': np.array([1, 0, 0, 0]),
-        'C': np.array([0, 1, 0, 0]), 'c': np.array([0, 1, 0, 0]),
-        'G': np.array([0, 0, 1, 0]), 'g': np.array([0, 0, 1, 0]),
-        'T': np.array([0, 0, 0, 1]), 't': np.array([0, 0, 0, 1]),
-        'U': np.array([0, 0, 0, 1]), 'u': np.array([0, 0, 0, 1]),
-        'W': np.array([0.5, 0, 0, 0.5]),
-        'S': np.array([0, 0.5, 0.5, 0]),
-        'N': np.array([0.25, 0.25, 0.25, 0.25]),
-        'n': np.array([0.25, 0.25, 0.25, 0.25]), 
-        ';': np.array([0, 0, 0, 0])
+        'A': np.array([1, 0, 0, 0], dtype=np.float16), 'a': np.array([1, 0, 0, 0], dtype=np.float16),
+        'C': np.array([0, 1, 0, 0], dtype=np.float16), 'c': np.array([0, 1, 0, 0], dtype=np.float16),
+        'G': np.array([0, 0, 1, 0], dtype=np.float16), 'g': np.array([0, 0, 1, 0], dtype=np.float16),
+        'T': np.array([0, 0, 0, 1], dtype=np.float16), 't': np.array([0, 0, 0, 1], dtype=np.float16),
+        'U': np.array([0, 0, 0, 1], dtype=np.float16), 'u': np.array([0, 0, 0, 1], dtype=np.float16),
+        'W': np.array([0.5,     0,    0,  0.5], dtype=np.float16),
+        'S': np.array([0,     0.5,  0.5,    0], dtype=np.float16),
+        'N': np.array([0.25, 0.25, 0.25, 0.25], dtype=np.float16),
+        'n': np.array([0.25, 0.25, 0.25, 0.25], dtype=np.float16), 
 }
 
 
