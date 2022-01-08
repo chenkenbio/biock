@@ -14,8 +14,6 @@ print_err = functools.partial(print, flush=True, file=sys.stderr)
 
 FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 # if os.path.exists(os.path.join(FILE_DIR, "variables.py")):
-from .variables import *
-
 
 ### misc
 def md5_file(fn):
@@ -70,10 +68,13 @@ def overlap_length(x1, x2, y1, y2):
         length = y2 - x1
     return length
 
+
 def distance(x1, x2, y1, y2):
     """ interval distance """
     d = overlap_length(x1, x2, y1, y2)
-    return -d
+    if d < 0:
+        warnings.warn("[{}, {}) overlaps with [{}, {})".format(x1, x2, y1, y2))
+    return max(-d, 0)
 
 def label_count(labels):
     """ labels should be list,np.array """
@@ -109,16 +110,13 @@ def split_train_valid_test(groups, train_keys, valid_keys, test_keys=None):
         return train_idx, valid_idx
 
 
-# #TODO: deprecate in the future
-# def overlap(x1, x2, y1, y2):
-#     warnings.warn("`overlap` should be replaced with `overlap_length`!")
-#     return overlap_length(x1, x2, y1, y2)
-
-
 def pandas_df2dict(fn, delimiter='\t', **kwargs):
-    import pandas as pd
-    kwargs["delimiter"] = delimiter
-    df = pd.read_csv(fn, **kwargs)
+    if type(fn) is str:
+        import pandas as pd
+        kwargs["delimiter"] = delimiter
+        df = pd.read_csv(fn, **kwargs)
+    else:
+        df = fn
     d = dict()
     for k in df.columns:
         d[k] = np.array(df[k])
@@ -172,50 +170,6 @@ def run_bash(cmd):
     out, err = out.decode('utf8'), err.decode('utf8')
     rc = p.returncode
     return (rc, out, err)
-
-
-## deep learning related
-#def model_summary(model):
-#    print("model_summary")
-#    print("Layer_name"+"\t"*7+"Number of Parameters")
-#    print("="*100)
-#    model_parameters = [layer for layer in model.parameters() if layer.requires_grad]
-#    layer_name = [child for child in model.children()]
-#    j = 0
-#    total_params = 0
-#    print("\t"*10)
-#    for i in layer_name:
-#        print()
-#        param = 0
-#        try:
-#            bias = (i.bias is not None)
-#        except:
-#            bias = False  
-#        if not bias:
-#            param =model_parameters[j].numel()+model_parameters[j+1].numel()
-#            j = j+2
-#        else:
-#            param =model_parameters[j].numel()
-#            j = j+1
-#        print(str(i)+"\t"*3+str(param))
-#        total_params+=param
-#    print("="*100)
-#    print(f"Total Params:{total_params}")     
-
-def model_summary(model):
-    """
-    model: pytorch model
-    """
-    import torch
-    total_param = 0
-    trainable_param = 0
-    for i, p in enumerate(model.parameters()):
-        num_p = torch.numel(p)
-        if p.requires_grad:
-            trainable_param += num_p
-        total_param += num_p
-    return {'total_param': total_param, 'trainable_param': trainable_param}
-
 
 
 class BasicBED(object):
@@ -310,7 +264,8 @@ class BasicFasta(object):
                 self.id2seq[seq_id] = seq
             pickle.dump(self.id2seq, gzip.open(self.cache, 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
 
-def load_fasta(fn):
+
+def load_fasta(fn: str) -> Dict[str, str]:
     fasta = dict()
     name, seq = None, list()
     with custom_open(fn) as infile:
@@ -323,7 +278,6 @@ def load_fasta(fn):
                 seq = list()
             else:
                 seq.append(l.strip())
-
     fasta[name] = ''.join(seq)
     return fasta
 
@@ -338,50 +292,6 @@ def array_summary(x):
 
 def random_string(n):
     return ''.join(random.choices(string.ascii_letters + string.digits, k=n))
-
-
-## constants & variables
-hg19_chromsize = {"chr1": 249250621, "chr2": 243199373, 
-        "chr3": 198022430, "chr4": 191154276, 
-        "chr5": 180915260, "chr6": 171115067, 
-        "chr7": 159138663, "chr8": 146364022, 
-        "chr9": 141213431, "chr10": 135534747, 
-        "chr11": 135006516, "chr12": 133851895, 
-        "chr13": 115169878, "chr14": 107349540, 
-        "chr15": 102531392, "chr16": 90354753, 
-        "chr17": 81195210, "chr18": 78077248, 
-        "chr19": 59128983, "chr20": 63025520, 
-        "chr21": 48129895, "chr22": 51304566, 
-        "chrX": 155270560, "chrY": 59373566,
-        "chrM": 16569, "chrMT": 16569}
-hg38_chromsize = {"chr1": 248956422, "chr2": 242193529,
-        "chr3": 198295559, "chr4": 190214555,
-        "chr5": 181538259, "chr6": 170805979,
-        "chr7": 159345973, "chr8": 145138636,
-        "chr9": 138394717, "chr10": 133797422,
-        "chr11": 135086622, "chr12": 133275309,
-        "chr13": 114364328, "chr14": 107043718,
-        "chr15": 101991189, "chr16": 90338345,
-        "chr17": 83257441, "chr18": 80373285,
-        "chr19": 58617616, "chr20": 64444167,
-        "chr21": 46709983, "chr22": 50818468,
-        "chrX": 156040895, "chrY": 57227415,
-        "chrM": 16569, "chrMT": 16569}
-chrom_size = {'hg19': hg19_chromsize, 'GRCh37': hg19_chromsize, "hg38": hg38_chromsize, "GRCh38": hg38_chromsize}
-
-nt_onehot_dict = {
-        'A': np.array([1, 0, 0, 0], dtype=np.float16), 'a': np.array([1, 0, 0, 0], dtype=np.float16),
-        'C': np.array([0, 1, 0, 0], dtype=np.float16), 'c': np.array([0, 1, 0, 0], dtype=np.float16),
-        'G': np.array([0, 0, 1, 0], dtype=np.float16), 'g': np.array([0, 0, 1, 0], dtype=np.float16),
-        'T': np.array([0, 0, 0, 1], dtype=np.float16), 't': np.array([0, 0, 0, 1], dtype=np.float16),
-        'U': np.array([0, 0, 0, 1], dtype=np.float16), 'u': np.array([0, 0, 0, 1], dtype=np.float16),
-        'W': np.array([0.5,     0,    0,  0.5], dtype=np.float16),
-        'S': np.array([0,     0.5,  0.5,    0], dtype=np.float16),
-        'N': np.array([0.25, 0.25, 0.25, 0.25], dtype=np.float16),
-        'n': np.array([0.25, 0.25, 0.25, 0.25], dtype=np.float16), 
-}
-
-
 
 
 if __name__ == "__main__":
