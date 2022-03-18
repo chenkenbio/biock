@@ -38,8 +38,10 @@ def make_logger(
     if filename is not None:
         if os.path.exists(filename):
             suffix = time.strftime("%Y%m%d-%H%M%S", time.localtime(os.path.getmtime(filename)))
-            shutil.move(filename, "{}.{}".format(filename, suffix))
-            warnings.warn("log {} exists, moved to to {}.{}".format(filename, filename, suffix))
+            while os.path.exists("{}.conflict_{}".format(filename, suffix)):
+                suffix = "{}_1".format(suffix)
+            shutil.move(filename, "{}.conflict_{}".format(filename, suffix))
+            warnings.warn("log {} exists, moved to to {}.conflict_{}".format(filename, filename, suffix))
         fh = logging.FileHandler(filename=filename, mode=filemode)
         fh.setLevel(level)
         fh.setFormatter(formatter)
