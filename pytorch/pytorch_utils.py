@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import torch
 import torch.nn as nn
 from torch import Tensor
@@ -29,8 +30,11 @@ def model_summary(model):
     return {'total_param': total_param, 'trainable_param': trainable_param}
 
 
-def make_onehot(N: int, dtype=torch.float) -> Tensor:
-    return torch.as_tensor(np.diag(np.ones(N)), dtype=dtype)
+def make_onehot(N: int, include_zero: bool=False, dtype=torch.float) -> Tensor:
+    onehot = torch.as_tensor(np.diag(np.ones(N)), dtype=dtype)
+    if include_zero:
+        onehot = torch.cat((torch.zeros((1, N)), onehot), dim=0),
+    return onehot
 
 
 def kl_divergence(mu1: Tensor, logvar1: Tensor, mu2: Optional[Tensor]=None, logvar2: Optional[Tensor]=None, reduction: Literal["mean"]="mean") -> Tensor:
@@ -43,3 +47,13 @@ def kl_divergence(mu1: Tensor, logvar1: Tensor, mu2: Optional[Tensor]=None, logv
         kl_div = torch.mean(kl_div)
     return kl_div
 
+
+def set_seed(seed: int):
+    if float(torch.version.cuda) >= 10.2:
+        os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+    import numpy as np
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.use_deterministic_algorithms(True)
+
+    
