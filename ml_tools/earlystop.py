@@ -28,8 +28,8 @@ class EarlyStopping(object):
 
         self.__eval_keys = set(eval_keys)
 
-        self.__losses = dict() # the less the better
-        self.__scores = dict() # the bigger the better
+        self.__losses = dict() # the less the improved
+        self.__scores = dict() # the bigger the improved
         for k in score_keys:
             self.__scores[k] = OrderedDict()
         for k in loss_keys:
@@ -57,14 +57,15 @@ class EarlyStopping(object):
         self.patience = patience
         self.best_epoch = -1
         self.wait = 0
+        self.go_on = True
+        self.improved = True
     
     def __str__(self):
         return "{}, scores: {}, losses: {}".format(
             type(self).__name__, self.__scores.keys(), self.__losses.keys())
     
-    def update(self, epoch: int, **kwargs) -> bool:
+    def update(self, epoch: int, **kwargs):
         ## kwargs: {key: score/loss, xxx: xxx}
-        ## return: continue ?
         values = list()
         for k in self.__scores:
             if k in kwargs:
@@ -83,23 +84,41 @@ class EarlyStopping(object):
             if k in self.__eval_keys:
                 values.append(self.__weight[k] * v)
 
-        if (self.__use_score and np.mean(values) > self.__best_score):
+        if (self.__use_score and np.mean(values) > self.__best_score): # improved score, go on
             self.best_epoch = epoch
             self.__best_score = np.mean(values)
             self.wait = 0
-            better = True
-        elif not self.__use_score and np.mean(values) < self.__best_loss:
+            self.improved = True
+            self.go_on = True
+        elif not self.__use_score and np.mean(values) < self.__best_loss: # decreased loss, go on
             self.best_epoch = epoch
             self.__best_loss = np.mean(values)
             self.wait = 0
-            better = True
+            self.improved = True
+            self.go_on = True
         else:
-            if epoch >= self.__delay:
+            self.improved = False
+            if epoch <= self.__delay:
+                self.go_on = True
+            elif self.wait <= self.patience:
                 self.wait += 1
-            better = False
-        return better
+                self.go_on = True
+            else:
+                self.go_on = False
+
+
+        
+        # elif epoch >= self.__delay: # before delay
+        #         self.wait += 1
+        #         self.go_on = False
+        #         self.improved = False
+        # else:   # early stop
+        #     self.improved = False
+        #     self.go_on = True
+        # # return self.go_on
     
-    def best_results(self, ):
+    @property
+    def best_results(self):
         best_results = dict()
         best_results["epoch"] = self.best_epoch
         for k, v in self.__losses.items():
