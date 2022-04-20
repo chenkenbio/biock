@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 
+from glob import glob
 import argparse, os, sys, warnings, time, json, gzip, logging, warnings, pickle
+import shutil
+import stat
+import filecmp
 import random, string
 import numpy as np
 from io import TextIOWrapper
 import subprocess
 from subprocess import Popen, PIPE
-from typing import Any, Dict, List, Text, TextIO, Union
+from typing import Any, Dict, List, Text, TextIO, Union, Iterable
 import functools
+import logging
+logger = logging.getLogger(__name__)
 
 print = functools.partial(print, flush=True)
 print_err = functools.partial(print, flush=True, file=sys.stderr)
@@ -16,6 +22,21 @@ FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 # if os.path.exists(os.path.join(FILE_DIR, "variables.py")):
 
 ### misc
+def pickle_dump(obj: Any, output, compression=None, force=False):
+    if os.path.exists(output) and not force:
+        raise IOError(r"File {obj} exists, use `force=True` to overwrite.")
+    if compression is None:
+        custom_open = functools.partial(open, mode='wb')
+    elif compression == 'gzip':
+        custom_open = functools.partial(gzip.open, mode='wb')
+    else:
+        raise KeyError("Unrecognized compression option: {}".format(compression))
+    pickle.dump(obj, custom_open(output), protocol=pickle.HIGHEST_PROTOCOL)
+
+def pickle_load(obj):
+    raise NotImplementedError
+
+
 def md5_file(fn):
     import hashlib
     return hashlib.md5(open(fn, 'rb').read()).hexdigest()
@@ -25,6 +46,18 @@ def hash_string(s):
     import hashlib
     return hashlib.sha256(s.encode()).hexdigest()
 
+def merge_intervals(intervals: List[List[int]], col1: int, col2: int) -> List[List[int]]:
+    intervals = [list(x) for x in intervals]
+    intervals = sorted(intervals, key=lambda x:(x[col1], x[col2]))
+    merged = list()
+    merged.append(intervals[0])
+    for x in intervals[1:]:
+        l, r = x[col1], x[col2]
+        if l <= merged[-1][col2]:
+            merged[-1][col2] = r
+        else:
+            merged.append(x)
+    return merged
 
 def str2num(s: str) -> Union[int, float]:
     s = s.strip()
@@ -40,7 +73,6 @@ def copen(fn: str, mode='rt') -> TextIOWrapper:
         return gzip.open(fn, mode=mode)
     else:
         return open(fn, mode=mode)
-custom_open = copen
 
 
 def strip_ENS_version(ensembl_id: str) -> str:
@@ -69,10 +101,10 @@ def overlap_length(x1, x2, y1, y2):
     return length
 
 
-def distance(x1, x2, y1, y2):
+def distance(x1, x2, y1, y2, nonoverlap=False):
     """ interval distance """
     d = overlap_length(x1, x2, y1, y2)
-    if d < 0:
+    if nonoverlap and d < 0:
         warnings.warn("[{}, {}) overlaps with [{}, {})".format(x1, x2, y1, y2))
     return max(-d, 0)
 
@@ -163,6 +195,25 @@ def make_directory(in_dir):
     if not os.path.isdir(outdir):
         os.makedirs(outdir)
     return outdir
+
+def remove_files(filenames: Union[str, Iterable[str]]) -> int:
+    """
+    Args:
+        filenames: filename/regex/file list
+    Return
+        cnt : number of deleted files
+    """
+    if type(filenames) is str:
+        if '*' in filenames:
+            filenames = glob(filenames)
+        else:
+            filenames = [filenames]
+    cnt = 0
+    for fn in filenames:
+        if os.path.exists(fn):
+            os.remove(fn)
+            cnt += 1
+    return cnt
 
 def run_bash(cmd):
     p = Popen(['/bin/bash', '-c', cmd], stdout=PIPE, stderr=PIPE)
@@ -268,7 +319,7 @@ class BasicFasta(object):
 def load_fasta(fn: str) -> Dict[str, str]:
     fasta = dict()
     name, seq = None, list()
-    with custom_open(fn) as infile:
+    with copen(fn) as infile:
         for l in infile:
             if l.startswith('>'):
                 if name is not None:
@@ -291,7 +342,61 @@ def array_summary(x):
     return r
 
 def random_string(n):
+    random.seed(time.time() % 3533)
     return ''.join(random.choices(string.ascii_letters + string.digits, k=n))
+
+
+def make_readonly(filename: str):
+    mode = os.stat(filename).st_mode
+    ro_mask = 0o777 ^ (stat.S_IWRITE | stat.S_IWGRP | stat.S_IWOTH)
+    os.chmod(filename, mode & ro_mask)
+
+
+def backup_file(src, dst, safe: bool=False) -> str:
+    r"""
+    Parameters
+    -----------
+    src : source file to be backup
+    dst : destination directory/filename
+    safe : make dst readonly
+
+    Return
+    -------
+    dst name or renamed dst name (when collision happens)
+    """
+    if os.path.isdir(dst):
+        dst = os.path.join(dst, os.path.basename(src))
+    if os.path.exists(dst):
+        if not filecmp.cmp(src, dst):
+            stamp = time.strftime("%Y_%m_%d-%H_%M_%S")
+            # dst = dst + stamp
+            while os.path.exists(dst + '.' + stamp):
+                stamp = time.strftime("%Y_%m_%d-%H_%M_%S")
+            dst = dst + '.' + stamp
+            shutil.copy2(src, dst)
+    else:
+        shutil.copy2(src, dst)
+    if safe:
+        make_readonly(dst)
+    return dst
+
+
+def wait_memory(min_memory=64, max_try: int=100, cycle_time=5):
+    cycle_time = cycle_time * 60
+    import psutil
+    free_mem = psutil.virtual_memory().available / (1024**3)
+    cnt = 0
+    while free_mem < min_memory and cnt < max_try:
+        cnt += 1
+        print("WARNING: inadequate memory! (required/available, GB): {:.1f}/{:.1f}, waitting {}s ...({}/{}, {})".format(min_memory, free_mem, cycle_time, cnt, max_try, time.asctime()), file=sys.stderr)
+        time.sleep(cycle_time)
+        free_mem = psutil.virtual_memory().available / (1024**3)
+    if free_mem >= min_memory:
+        enough = True
+    else:
+        enough = False
+        raise MemoryError("Timeout, inadquate memory!".format(max_try))
+    return enough
 
 
 if __name__ == "__main__":
