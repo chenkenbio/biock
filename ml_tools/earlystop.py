@@ -1,23 +1,26 @@
 
-from typing import Dict, List, Union
+from typing import Any, Dict, List, Union
 from collections import OrderedDict
 import numpy as np
 from biock.logger import make_logger
+import copy
 
 logger = make_logger(title="")
 
 class EarlyStopping(object):
     def __init__(self, \
             eval_keys: List[str], \
-            score_keys: List[str], \
-            loss_keys: List[str], \
             n_delay: int, \
+            score_keys: List[str]=list(), \
+            loss_keys: List[str]=list(), \
             weight: Union[None, Dict[str, float]]=None, \
-            patience: int=10
+            patience: int=10,
+            threshold=1E-4
         ) -> None:
         """
         n_delay: supress early stop for the first n_delay epoches
         """
+        assert len(score_keys) + len(loss_keys) > 0, "both score_keys and loss_keys are None"
         if type(eval_keys) is str:
             eval_keys = [eval_keys]
         if type(score_keys) is str:
@@ -27,6 +30,7 @@ class EarlyStopping(object):
         assert len(set(eval_keys).difference(set(score_keys).union(set(loss_keys)))) == 0, "eval_key"
 
         self.__eval_keys = set(eval_keys)
+        self.threshold = threshold
 
         self.__losses = dict() # the less the improved
         self.__scores = dict() # the bigger the improved
@@ -60,6 +64,14 @@ class EarlyStopping(object):
         self.go_on = True
         self.improved = True
     
+    def state_dict(self) -> Dict[str, Any]:
+        return copy.deepcopy(self.__dict__)
+    
+    def load_state_dict(self, d: Dict[str, Any]):
+        for k, v in d.items():
+            self.__dict__[k] = v
+
+    
     def __str__(self):
         return "{}, scores: {}, losses: {}".format(
             type(self).__name__, self.__scores.keys(), self.__losses.keys())
@@ -84,13 +96,13 @@ class EarlyStopping(object):
             if k in self.__eval_keys:
                 values.append(self.__weight[k] * v)
 
-        if (self.__use_score and np.mean(values) > self.__best_score): # improved score, go on
+        if self.__use_score and np.mean(values) > self.__best_score + self.threshold: # improved score, go on
             self.best_epoch = epoch
             self.__best_score = np.mean(values)
             self.wait = 0
             self.improved = True
             self.go_on = True
-        elif not self.__use_score and np.mean(values) < self.__best_loss: # decreased loss, go on
+        elif not self.__use_score and np.mean(values) < self.__best_loss - self.threshold: # decreased loss, go on
             self.best_epoch = epoch
             self.__best_loss = np.mean(values)
             self.wait = 0
@@ -98,24 +110,14 @@ class EarlyStopping(object):
             self.go_on = True
         else:
             self.improved = False
-            if epoch <= self.__delay:
+            self.wait += 1
+            if epoch < self.__delay:
+                self.wait = 0
                 self.go_on = True
-            elif self.wait <= self.patience:
-                self.wait += 1
+            elif self.wait < self.patience:
                 self.go_on = True
             else:
                 self.go_on = False
-
-
-        
-        # elif epoch >= self.__delay: # before delay
-        #         self.wait += 1
-        #         self.go_on = False
-        #         self.improved = False
-        # else:   # early stop
-        #     self.improved = False
-        #     self.go_on = True
-        # # return self.go_on
     
     @property
     def best_results(self):
