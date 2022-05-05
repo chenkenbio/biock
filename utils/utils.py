@@ -2,7 +2,10 @@
 
 from glob import glob
 import argparse, os, sys, warnings, time, json, gzip, logging, warnings, pickle
+from collections import OrderedDict
+from argparse import Namespace
 import shutil
+import inspect
 import stat
 import filecmp
 import random, string
@@ -13,7 +16,7 @@ from subprocess import Popen, PIPE
 from typing import Any, Dict, List, Text, TextIO, Union, Iterable
 import functools
 import logging
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
 
 print = functools.partial(print, flush=True)
 print_err = functools.partial(print, flush=True, file=sys.stderr)
@@ -316,8 +319,22 @@ class BasicFasta(object):
             pickle.dump(self.id2seq, gzip.open(self.cache, 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
 
 
-def load_fasta(fn: str) -> Dict[str, str]:
-    fasta = dict()
+def load_fasta(fn: str, ordered: bool=False) -> Dict[str, str]:
+    r"""
+    load fasta as sequence dict
+    Input
+    -----
+    fn : path to fasta file
+    ordered : False - dict, True - OrderedDict
+
+    Return
+    -------
+    seq_dict : Dict[str, str] or OrderedDict[str, str]
+    """
+    if ordered:
+        fasta = OrderedDict()
+    else:
+        fasta = dict()
     name, seq = None, list()
     with copen(fn) as infile:
         for l in infile:
@@ -352,7 +369,7 @@ def make_readonly(filename: str):
     os.chmod(filename, mode & ro_mask)
 
 
-def backup_file(src, dst, safe: bool=False) -> str:
+def backup_file(src, dst, readonly: bool=False, **kwargs) -> str:
     r"""
     Parameters
     -----------
@@ -364,19 +381,32 @@ def backup_file(src, dst, safe: bool=False) -> str:
     -------
     dst name or renamed dst name (when collision happens)
     """
+    if "safe" in kwargs:
+        readonly = kwargs["safe"]
+        warnings.warn("`safe` should be replaced with `readonly`")
+    if inspect.ismodule(src):
+        src = src.__file__
+    elif inspect.isclass(src):
+        src = inspect.getfile(src)
+        
     if os.path.isdir(dst):
         dst = os.path.join(dst, os.path.basename(src))
+    bn = os.path.basename(dst)
+    if '.' in bn:
+        suffix = bn.split('.')[-1]
+    else:
+        suffix = ""
     if os.path.exists(dst):
         if not filecmp.cmp(src, dst):
-            stamp = time.strftime("%Y_%m_%d-%H_%M_%S")
+            stamp = '.'.join([time.strftime("%Y_%m_%d-%H_%M_%S"), suffix])
             # dst = dst + stamp
             while os.path.exists(dst + '.' + stamp):
-                stamp = time.strftime("%Y_%m_%d-%H_%M_%S")
+                stamp = '.'.join([time.strftime("%Y_%m_%d-%H_%M_%S"), suffix])
             dst = dst + '.' + stamp
             shutil.copy2(src, dst)
     else:
         shutil.copy2(src, dst)
-    if safe:
+    if readonly:
         make_readonly(dst)
     return dst
 
@@ -397,6 +427,26 @@ def wait_memory(min_memory=64, max_try: int=100, cycle_time=5):
         enough = False
         raise MemoryError("Timeout, inadquate memory!".format(max_try))
     return enough
+
+
+def check_exists(*argv):
+    missing = list()
+    for fn in argv:
+        if fn is None:
+            continue
+        elif not os.path.exists(fn):
+            missing.append(fn)
+    if len(missing) > 0:
+        raise FileExistsError("Missing file(s): {}".format(', '.join(missing)))
+
+
+def check_args(args: Namespace, *keys):
+    is_none = list()
+    for k in keys:
+        if args.__dict__[k] is None:
+            is_none.append(k)
+    if len(is_none) > 0:
+        raise ValueError("{} is(are) None".format('/'.join(["args.{}".format(k) for k in  is_none])))
 
 
 if __name__ == "__main__":
