@@ -28,12 +28,29 @@ class SelfAttentionEmbedding(nn.Module):
         self.att_second.bias.data.fill_(0)
         self.require_penalty = require_penalty
         self.skip_max = skip_max
+        self.out_dim = d_model if skip_max else (2 * d_model)
     
-    def forward(self, seq: Tensor) -> Tensor:
-        ## input: (B, S, E)
+    def forward(self, seq: Tensor, mask: Tensor=None) -> Tensor:
+        """
+        input
+        ------
+        seq : (B, S, E)
+        mask : (B, S) or (B, S, E)
+        
+        Return
+        ------ 
+        embedding : (B, r, E)
+        """
         bs, device  = seq.size(0), seq.device
         att = torch.tanh(self.att_first(seq))  #(B, S, E) -> (B, S, da)
-        att = F.softmax(self.att_second(att), dim=1).transpose(1, 2) # (B, S, da) -> (B, S, r) -> (B, r, S)
+        att = self.att_second(att) # (B, S, da) -> (B, S, r) 
+        if mask is not None:
+            if mask.ndim < att.ndim:
+                mask = mask.unsqueeze(2)
+            att.masked_fill_(mask, float("-inf"))
+
+        att = F.softmax(att, dim=1).transpose(1, 2) # -> (B, r, S)
+
         seq = torch.matmul(att, seq) # (B, r, S) x (B, S, E) -> (B, r, E)
         if self.skip_max:
             seq = seq.mean(dim=1).view(bs, -1)
@@ -57,8 +74,10 @@ class PerformerEncoderLayer(nn.Module):
             dropout: float=0.1, \
             activation="relu", \
             layer_norm_eps=1e-5, \
+            batch_first: bool=False,
             **kwargs):
         super(PerformerEncoderLayer, self).__init__()
+        self.batch_first = batch_first
         self.self_attn = PerformerAttention(
             dim=d_model, 
             causal=False, 
@@ -77,7 +96,15 @@ class PerformerEncoderLayer(nn.Module):
 
         self.activation = nn.ReLU()
     
-    def forward(self, src: Tensor):
+    def forward(self, src: Tensor) -> Tensor:
+        r"""
+        Args:
+            src: input sequence
+        Shape: 
+        src: :math: `(S, N, E)` if `batch_first=False` or `(N, S, E)` if `batch_first=True`
+        """
+        if not self.batch_first:
+            src = src.transpose(0, 1)
         src2 = self.self_attn(src)
         src = src + src2
         src = self.norm1(src)
@@ -101,6 +128,10 @@ class PerformerEncoder(nn.Module):
         self.norm = norm
     
     def forward(self, src: Tensor) -> Tensor:
+        """
+        Args:
+            src
+        """
         output = src
         for mod in self.layers:
             output = mod(output)
