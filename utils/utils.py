@@ -13,10 +13,11 @@ import numpy as np
 from io import TextIOWrapper
 import subprocess
 from subprocess import Popen, PIPE
-from typing import Any, Dict, List, Text, TextIO, Union, Iterable
+from typing import Any, Dict, List, Text, TextIO, Union, Iterable, Tuple
 import functools
 import logging
-# logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
+# from biock.genomics import HG38_FASTA, HG19_FASTA
 
 print = functools.partial(print, flush=True)
 print_err = functools.partial(print, flush=True, file=sys.stderr)
@@ -45,6 +46,17 @@ def md5_file(fn):
     return hashlib.md5(open(fn, 'rb').read()).hexdigest()
 
 
+def has_module(module):
+    import imp
+    exist = None
+    try:
+        imp.find_module(module)
+        exist = True
+    except ImportError:
+        exist = False
+    return exist
+
+
 def hash_string(s):
     import hashlib
     return hashlib.sha256(s.encode()).hexdigest()
@@ -71,11 +83,16 @@ def str2num(s: str) -> Union[int, float]:
     return n
 
 
-def copen(fn: str, mode='rt') -> TextIOWrapper:
-    if fn.endswith(".gz"):
-        return gzip.open(fn, mode=mode)
+def copen(input: Union[str, TextIOWrapper], mode='rt') -> TextIOWrapper:
+    if isinstance(input, str):
+        if input.endswith(".gz"):
+            return gzip.open(input, mode=mode)
+        else:
+            return open(input, mode=mode)
+    elif isinstance(input, TextIOWrapper):
+        return input
     else:
-        return open(fn, mode=mode)
+        raise IOError("Unknown input type {}".format(type(input)))
 
 
 def strip_ENS_version(ensembl_id: str) -> str:
@@ -102,6 +119,19 @@ def overlap_length(x1, x2, y1, y2):
     else:
         length = y2 - x1
     return length
+
+def overlap_length2(x1, x2, y1, y2):
+    """ [x1, x2), [y1, y2) """
+    length = 0
+    x1, x2, y1, y2 = int(x1), int(x2), int(y1), int(y2)
+    if x2 <= y1:
+        length = x2 - y1
+    elif x1 >= y2:
+        length = y2 - x1
+    else:
+        length = min(x2, y2) - max(x1, y1)
+    return length
+
 
 
 def distance(x1, x2, y1, y2, nonoverlap=False):
@@ -173,14 +203,14 @@ def prog_header(args=None, out=sys.stdout):
     if args is not None:
         print("##: Args: {}".format(args))
 
-def get_logger(log_level="INFO"):
-    logging.basicConfig(
-                format='[%(asctime)s %(levelname)s] %(message)s',
-                    stream=sys.stdout
-            )
-    log = logging.getLogger(__name__)
-    log.setLevel(log_level)
-    return log
+# def get_logger(log_level="INFO"):
+#     logging.basicConfig(
+#                 format='[%(asctime)s %(levelname)s] %(message)s',
+#                     stream=sys.stdout
+#             )
+#     log = logging.getLogger(__name__)
+#     log.setLevel(log_level)
+#     return log
 
 
 ### file & directory
@@ -218,7 +248,14 @@ def remove_files(filenames: Union[str, Iterable[str]]) -> int:
             cnt += 1
     return cnt
 
-def run_bash(cmd):
+def run_bash(cmd) -> Tuple[int, str, str]:
+    r"""
+    Return
+    -------
+    rc : return code
+    out : output
+    err : error
+    """
     p = Popen(['/bin/bash', '-c', cmd], stdout=PIPE, stderr=PIPE)
     out, err = p.communicate()
     out, err = out.decode('utf8'), err.decode('utf8')
@@ -319,35 +356,16 @@ class BasicFasta(object):
             pickle.dump(self.id2seq, gzip.open(self.cache, 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
 
 
-def load_fasta(fn: str, ordered: bool=False) -> Dict[str, str]:
-    r"""
-    load fasta as sequence dict
-    Input
-    -----
-    fn : path to fasta file
-    ordered : False - dict, True - OrderedDict
 
-    Return
-    -------
-    seq_dict : Dict[str, str] or OrderedDict[str, str]
-    """
-    if ordered:
-        fasta = OrderedDict()
-    else:
-        fasta = dict()
-    name, seq = None, list()
-    with copen(fn) as infile:
+
+def load_chrom_size(fai) -> Dict[str, int]:
+    chromsize = dict()
+    with open(fai) as infile:
         for l in infile:
-            if l.startswith('>'):
-                if name is not None:
-                    # print("{}\n{}".format(name, ''.join(seq)))
-                    fasta[name] = ''.join(seq)
-                name = l.strip().lstrip('>')
-                seq = list()
-            else:
-                seq.append(l.strip())
-    fasta[name] = ''.join(seq)
-    return fasta
+            chrom, size = l.strip().split('\t')[:2]
+            chromsize[chrom] = int(size)
+    return chromsize
+
 
 
 def array_summary(x):
@@ -411,6 +429,7 @@ def backup_file(src, dst, readonly: bool=False, **kwargs) -> str:
     return dst
 
 
+
 def wait_memory(min_memory=64, max_try: int=100, cycle_time=5):
     cycle_time = cycle_time * 60
     import psutil
@@ -447,6 +466,44 @@ def check_args(args: Namespace, *keys):
             is_none.append(k)
     if len(is_none) > 0:
         raise ValueError("{} is(are) None".format('/'.join(["args.{}".format(k) for k in  is_none])))
+
+
+
+
+def get_run_info(argv: List[str], args: Namespace=None) -> str:
+    s = list()
+    s.append("")
+    s.append("##time: {}".format(time.asctime()))
+    s.append("##cwd: {}".format(os.getcwd()))
+    s.append("##cmd: {}".format(' '.join(argv)))
+    if args is not None:
+        s.append("##args: {}".format(args))
+    return '\n'.join(s)
+
+
+
+class LabelEncoder(object):
+    def __init__(self, predefined_mapping: Dict[str, int]=dict()) -> None:
+        self.mapping = predefined_mapping.copy()
+        if len(self.mapping) == 0:
+            self._next = 0
+        else:
+            self._next = max(self.mapping.values()) + 1
+        self.reverse_mapping = {v:k for k, v in self.mapping.items()}
+    
+    def __call__(self, label) -> int:
+        if label not in self.mapping:
+            self.mapping[label] = self._next
+            self.reverse_mapping[self._next] = label
+            self._next += 1
+        return self.mapping[label]
+
+    def id2label(self, id) -> str:
+        return self.reverse_mapping[id]
+        
+
+def np_onehot(ar, num_classes: int):
+    pass
 
 
 if __name__ == "__main__":
