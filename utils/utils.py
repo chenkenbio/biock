@@ -26,6 +26,17 @@ FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 # if os.path.exists(os.path.join(FILE_DIR, "variables.py")):
 
 ### misc
+def count_items(ar: List, sort_counts: bool=False, reverse: bool=True, fraction: bool=False):
+    ar = np.asarray(ar)
+    if sort_counts:
+        results = sorted(zip(*np.unique(ar, return_counts=True)), key=lambda x:x[1], reverse=reverse)
+    else:
+        results = list(zip(*np.unique(ar, return_counts=True)))
+    if fraction:
+        total = len(ar)
+        results = [list(x) + [round(x[1] / total, 3)] for x in results]
+    return results
+
 def pickle_dump(obj: Any, output, compression=None, force=False):
     if os.path.exists(output) and not force:
         raise IOError(r"File {obj} exists, use `force=True` to overwrite.")
