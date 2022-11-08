@@ -8,11 +8,14 @@ from tqdm import tqdm
 import warnings
 import sys
 from collections import defaultdict, namedtuple, OrderedDict
-from typing import Any, Union, List, Dict, Tuple
+from typing import Any, Union, List, Dict, Tuple, Literal
+import numpy as np
 import json
 import logging
 import pickle
-from ..utils import copen, has_module
+import h5py
+from .constants import NN_COMPLEMENT, NN_COMPLEMENT_INT, _CHROM2INT
+from ..utils import copen
 from ..variables import HUMAN_CHROMS_ALL
 try:
     import pyfaidx
@@ -21,32 +24,31 @@ except ImportError as err:
 
 logger = logging.getLogger(__name__)
 
+GTFRecord = namedtuple("GTFRecord", field_names=[
+                       "chrom", "start", "end", "strand", "feature_type", "attrs"])
 
-GTFRecord = namedtuple("GTF_record", field_names=["chrom", "start", "end", "strand", "feature_type", "attrs"])
+
 def parse_gtf_record(gtf_line: str, to_dict=False) -> GTFRecord:
     r"""
     Return:
     -------
     chrom : str
-    ftype : str
+    feature_type: str
     start : int
     end : int
     strand : str
     attrs : dict
     """
     try:
-        chrom, _, ftype, start, end, _, strand, _, fields = gtf_line.strip().rstrip(';').split('\t')
+        chrom, _, feature_type, start, end, _, strand, _, fields = gtf_line.strip(
+        ).rstrip(';').split('\t')
     except:
-        raise RuntimeError("{}".format(gtf_line.strip()))
+        raise ValueError("failed to parse: {}".format(gtf_line.strip()))
     attrs = dict()
     for kv in fields.split('; '):
-        try:
-            v = kv.split(' ')
-            k = v[0]
-            v = ' '.join(v[1:])
-        except ValueError as err:
-            print(kv, gtf_line)
-            exit(err)
+        v = kv.split(' ')
+        k = v[0]
+        v = ' '.join(v[1:])
         v = v.strip('"')
         if k in attrs:
             if isinstance(attrs[k], str):
@@ -56,23 +58,25 @@ def parse_gtf_record(gtf_line: str, to_dict=False) -> GTFRecord:
             attrs[k] = v
     if to_dict:
         return {
-                    "chrom":  chrom, 
-                    "ftype": ftype, 
-                    "start": int(start), 
-                    "end": int(end), 
-                    "strand": strand, 
-                    "attrs": attrs
-                }
+            "chrom":  chrom,
+            "feature_type": feature_type,
+            "start": int(start),
+            "end": int(end),
+            "strand": strand,
+            "attrs": attrs
+        }
     else:
-        return GTFRecord(chrom=chrom, start=int(start), end=int(end), strand=strand, feature_type=ftype, attrs=attrs)
+        return GTFRecord(chrom=chrom, start=int(start), end=int(end), strand=strand, feature_type=feature_type, attrs=attrs)
 
 
 def chrom_add_chr(chrom: Union[str, List[str]]) -> Union[str, List[str]]:
     if isinstance(chrom, str):
         chrom = "chr{}".format(chrom) if not chrom.startswith("chr") else chrom
     else:
-        chrom = ['chr{}'.format(c) if not c.startswith("chr") else c for c in chrom]
+        chrom = ['chr{}'.format(c) if not c.startswith(
+            "chr") else c for c in chrom]
     return chrom
+
 
 def chrom_remove_chr(chrom: Union[str, List[str]]) -> Union[str, List[str]]:
     if isinstance(chrom, str):
@@ -86,8 +90,10 @@ def chrom_add_chr(chrom: str) -> str:
     if isinstance(chrom, str):
         chrom = chrom if chrom.startswith("chr") else "chr{}".format(chrom)
     else:
-        chrom = [chrom if chrom.startswith("chr") else "chr{}".format(chrom) for c in chrom]
+        chrom = [chrom if chrom.startswith(
+            "chr") else "chr{}".format(chrom) for c in chrom]
     return chrom
+
 
 def ensembl_remove_version(ensembl_id: str) -> str:
     if ensembl_id.startswith("ENS"):
@@ -96,7 +102,8 @@ def ensembl_remove_version(ensembl_id: str) -> str:
             suffix = "_PAR_Y"
         ensembl_id = ensembl_id.split('.')[0] + suffix
     return ensembl_id
-        
+
+
 def fix_peak_name(name: str, sep: str) -> str:
     c, s, e = name.split(sep)
     return "{}:{}-{}".format(c, s, e)
@@ -117,12 +124,14 @@ def load_gene_info(tss_bed, prefix=None) -> Tuple[Dict, Dict, Dict, Dict]:
         try:
             gene2chrom = json.load(open("{}.gene2chrom.json".format(prefix)))
             gene2tss = json.load(open("{}.gene2tss.json".format(prefix)))
-            gene_id2name = json.load(open("{}.gene_id2name.json".format(prefix)))
-            gene_name2id = json.load(open("{}.gene_name2id.json".format(prefix)))
+            gene_id2name = json.load(
+                open("{}.gene_id2name.json".format(prefix)))
+            gene_name2id = json.load(
+                open("{}.gene_name2id.json".format(prefix)))
             logger.info("- logging cache from {}.*.json".format(prefix))
         except FileNotFoundError:
             all_loaded = False
-    
+
     if not all_loaded:
         gene2tss, gene2chrom = defaultdict(set), defaultdict(set)
         gene_name2id, gene_id2name = defaultdict(set), defaultdict(set)
@@ -133,7 +142,8 @@ def load_gene_info(tss_bed, prefix=None) -> Tuple[Dict, Dict, Dict, Dict]:
                 non_chrom_contigs.add(chrom)
                 # if chrom not in HUMAN_CHROMS_NO_MT:
                 #     continue
-                gene_id, gene_name, gene_type, tx_id, tss, strand = name.split('|')
+                gene_id, gene_name, gene_type, tx_id, tss, strand = name.split(
+                    '|')
                 gene_id = ensembl_remove_version(gene_id)
                 tss = int(tss)
                 gene2tss[gene_id].add((chrom, tss, strand))
@@ -166,15 +176,18 @@ def load_gene_info(tss_bed, prefix=None) -> Tuple[Dict, Dict, Dict, Dict]:
         gene_id2name = {g: list(v) for g, v in gene_id2name.items()}
 
         if prefix is not None:
-            json.dump(gene2chrom, open("{}.gene2chrom.json".format(prefix), 'w'), indent=4) 
-            json.dump(gene2tss, open("{}.gene2tss.json".format(prefix), 'w'), indent=4)
-            json.dump(gene_id2name, open("{}.gene_id2name.json".format(prefix), 'w'), indent=4)
-            json.dump(gene_name2id, open("{}.gene_name2id.json".format(prefix), 'w'), indent=4)
+            json.dump(gene2chrom, open(
+                "{}.gene2chrom.json".format(prefix), 'w'), indent=4)
+            json.dump(gene2tss, open(
+                "{}.gene2tss.json".format(prefix), 'w'), indent=4)
+            json.dump(gene_id2name, open(
+                "{}.gene_id2name.json".format(prefix), 'w'), indent=4)
+            json.dump(gene_name2id, open(
+                "{}.gene_name2id.json".format(prefix), 'w'), indent=4)
     return gene2chrom, gene2tss, gene_id2name, gene_name2id
 
 
-
-def load_fasta(fn: str, no_chr: bool=False, ordered: bool=False, cache: bool=True, gencode_style: bool=False) -> Dict[str, str]:
+def load_fasta(fn: str, no_chr: bool = False, ordered: bool = False, cache: bool = True, gencode_style: bool = False) -> Dict[str, str]:
     r"""
     load fasta as sequence dict
     Input
@@ -203,9 +216,11 @@ def load_fasta(fn: str, no_chr: bool=False, ordered: bool=False, cache: bool=Tru
     name, seq = None, list()
     if cache:
         if no_chr:
-            cache = fn + (".gencode.nochr.cache.pkl" if gencode_style else ".nochr.cache.pkl")
+            cache = fn + \
+                (".gencode.nochr.cache.pkl" if gencode_style else ".nochr.cache.pkl")
         else:
-            cache = fn + (".gencode.cache.pkl" if gencode_style else ".cache.pkl")
+            cache = fn + \
+                (".gencode.cache.pkl" if gencode_style else ".cache.pkl")
     else:
         cache = None
     if cache is not None and os.path.exists(cache):
@@ -231,24 +246,110 @@ def load_fasta(fn: str, no_chr: bool=False, ordered: bool=False, cache: bool=Tru
         fasta[name] = ''.join(seq)
         if cache is not None:
             try:
-                pickle.dump(fasta, open(cache, 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
+                pickle.dump(fasta, open(cache, 'wb'),
+                            protocol=pickle.HIGHEST_PROTOCOL)
             except IOError as err:
                 warnings.warn("{}".format(err))
     return fasta
 
 
-class Genome(object):
-    def __init__(self, fasta, in_memory: bool=True) -> None:
-        self.in_memory = in_memory
-        if in_memory and has_module("pyfaidx"):
-            self.fasta = pyfaidx.Fasta(fasta)
+def get_reverse_strand(seq, join: bool = True, integer: bool = False):
+    if integer:
+        seq = NN_COMPLEMENT_INT[seq][::-1].copy()
+    else:
+        if join:
+            seq = ''.join([NN_COMPLEMENT.get(n, n) for n in seq[::-1]])
         else:
-            self.fasta = load_fasta(fasta)
-    
-    def get_seq(self, chrom: str, start: int, end: int) -> str:
-        seq = self.fasta[chrom][start:end]
-        if self.in_memory:
-            seq = seq.seq
+            seq = [NN_COMPLEMENT.get(n, n) for n in seq[::-1]]
+    return seq
+
+
+class Hdf5Genome(object):
+    def __init__(self, fasta) -> None:
+        if not fasta.endswith(".h5") and not fasta.endswith(".hdf5"):
+            if fasta.endswith(".fa.gz"):
+                bn = fasta.replace(".fa.gz", "")
+            elif fasta.endswith(".fa"):
+                bn = fasta.replace(".fa", "")
+            if os.path.exists(bn + ".h5"):
+                fasta = bn + ".h5"
+            elif os.path.exists(bn + ".hdf5"):
+                fasta = bn + ".hdf5"
+        assert os.path.exists(fasta)
+        self.genome = h5py.File(fasta, 'r')
+        self.number2text = np.asarray(
+            ['N', 'A', 'C', 'G', 'T', 't', 'g', 'c', 'a'])
+        # 0
+
+    def fetch(self, chrom: str, start: int, end: int, text=True, reverse: bool = False) -> str:
+        seq = self.genome[chrom][start:end]
+        if text:
+            seq = ''.join(self.number2text[seq])
+        if reverse:
+            seq = get_reverse_strand(seq, integer=not text)
         return seq
-        
-        
+
+
+def _counts_per_size(mtx: np.ndarray, log: bool = False, target_reads: int = 1e6) -> np.ndarray:
+    """
+    Args:
+        mtx : cell by gene matrix
+    Return:
+        cpm/logcpm
+    """
+    size = np.asarray(mtx).sum(axis=1)
+    cpm = ((target_reads / size) * mtx.T).T
+    if log:
+        cpm = np.log1p(cpm)
+    return cpm
+
+
+def counts_per_thousand(mtx, log: bool = False) -> np.ndarray:
+    return _counts_per_size(mtx, log, target_reads=1000)
+
+
+def counts_per_million(mtx, log: bool = False) -> np.ndarray:
+    return _counts_per_size(mtx, log, target_reads=1E6)
+
+
+def _reverse_counts_per_scale(mtx, libsize, target_reads) -> np.ndarray:
+    raise NotImplementedError
+
+
+def reverse_counts_per_million():
+    raise NotImplementedError
+    return _reverse_counts_per_scale()
+
+
+class Chrom2Int(object):
+    def __init__(self) -> None:
+        self.mapping = _CHROM2INT.copy()
+        self.reverse_mapping = {v: k for k, v in self.mapping.items()}
+        self._next = max(self.mapping.values()) + 1
+
+    def __call__(self, chrom) -> int:
+        if chrom not in self.mapping:
+            self.mapping[chrom] = self._next
+            self.reverse_mapping[self._next] = chrom
+            self._next += 1
+        return self.mapping[chrom]
+
+    def int2chrom(self, idx):
+        return self.reverse_mapping[idx]
+
+
+def chrom2int(chrom):
+    if chrom in _CHROM2INT:
+        chrom = _CHROM2INT[chrom]
+    return chrom
+
+
+def load_chrom_size(fai) -> Dict[str, int]:
+    chrom_size = dict()
+    with open(fai) as infile:
+        for l in infile:
+            chrom, size = l.split()[:2]
+            chrom_size[chrom] = int(size)
+    # if chrom.startswith("chr"):
+    #     chrom_size[chrom[3:]] = int(size)
+    return chrom_size
