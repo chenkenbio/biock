@@ -9,7 +9,8 @@ def get_args():
     p = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     subparsers = p.add_subparsers(title="subparsers")
     fetch = subparsers.add_parser('fetch')
-    fetch.add_argument("gtf")
+    fetch.add_argument("-i", "--input", required=True, dest="gtf", help="GTF file")
+    fetch.add_argument("-f", "--feature-type", default="all")
     fetch.add_argument("--sep", '-s', default='|', help="delimiter character")
     fetch.add_argument("--attributes", '-a', nargs='+', required=True)
     # p.add_argument('--seed', type=int, default=2020)
@@ -17,6 +18,10 @@ def get_args():
 
 
 if __name__ == "__main__":
-    args = get_args().parse_args()
+    p = get_args()
+    args = p.parse_args()
+    if args.gtf is None:
+        p.parse_args(['--help'])
+
     if args.gtf is not None:
-        gtf_to_bed(args.gtf, attrs=args.attributes, sep=args.sep)
+        gtf_to_bed(args.gtf, args.feature_type, attrs=args.attributes, sep=args.sep, zero_start=False)
