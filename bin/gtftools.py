@@ -7,9 +7,9 @@ from biock import gtf_to_bed
 
 def get_args():
     p = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    subparsers = p.add_subparsers(title="subparsers")
+    subparsers = p.add_subparsers(title="command", dest="command")
     fetch = subparsers.add_parser('fetch')
-    fetch.add_argument("-i", "--input", required=True, dest="gtf", help="GTF file")
+    fetch.add_argument("-i", "--input", required=True, metavar="gtf", help="GTF file")
     fetch.add_argument("-f", "--feature-type", default="all")
     fetch.add_argument("--sep", '-s', default='|', help="delimiter character")
     fetch.add_argument("--attributes", '-a', nargs='+', required=True)
@@ -20,8 +20,8 @@ def get_args():
 if __name__ == "__main__":
     p = get_args()
     args = p.parse_args()
-    if args.gtf is None:
+    if args.command is None:
         p.parse_args(['--help'])
 
-    if args.gtf is not None:
+    if args.input is not None:
         gtf_to_bed(args.gtf, args.feature_type, attrs=args.attributes, sep=args.sep, zero_start=False)
