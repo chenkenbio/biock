@@ -1,5 +1,6 @@
 
 import copy
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -18,7 +19,7 @@ class SelfAttentionEmbedding(nn.Module):
     """
     based on https://github.com/kaushalshetty/Structured-Self-Attention
     """
-    def __init__(self, d_model: int, da: int, r: int, require_penalty: bool=False, skip_max: bool=False):
+    def __init__(self, d_model: int, da: int, r: int, skip_max: bool=False, **kwargs):
         super(SelfAttentionEmbedding, self).__init__()
         self.da = da
         self.r = r
@@ -26,11 +27,10 @@ class SelfAttentionEmbedding(nn.Module):
         self.att_first.bias.data.fill_(0)
         self.att_second = nn.Linear(da, r)
         self.att_second.bias.data.fill_(0)
-        self.require_penalty = require_penalty
         self.skip_max = skip_max
         self.out_dim = d_model if skip_max else (2 * d_model)
     
-    def forward(self, seq: Tensor, mask: Tensor=None) -> Tensor:
+    def forward(self, seq: Tensor, mask: Tensor=None, require_penalty=False) -> Tensor:
         """
         input
         ------
@@ -59,10 +59,10 @@ class SelfAttentionEmbedding(nn.Module):
                 seq.mean(dim=1).view(bs, -1),
                 seq.max(dim=1)[0].view(bs, -1)
             ), dim=1)
-        if self.require_penalty:
+        if require_penalty:
             identity = torch.eye(self.r).to(device) # (r, r)
             identity = Variable(identity.unsqueeze(0).expand(bs, self.r, self.r)) # (B, r, r)
-            penal = torch.linalg.matrix_norm(torch.matmul(att, att.transpose(1, 2)) - identity).mean() # different from the original implementation
+            penal = torch.linalg.norm(torch.matmul(att, att.transpose(1, 2)) - identity).mean() # different from the original implementation
             return seq, penal
         else:
             return seq
@@ -143,3 +143,30 @@ class PerformerEncoder(nn.Module):
 
 
 
+class PositionalEncoding(nn.Module):
+
+    def __init__(self, d_hid, n_position=200):
+        super(PositionalEncoding, self).__init__()
+
+        # Not a parameter
+        self.register_buffer('pos_table', self._get_sinusoid_encoding_table(n_position, d_hid))
+
+    def _get_sinusoid_encoding_table(self, n_position, d_hid):
+        ''' Sinusoid position encoding table '''
+        # TODO: make it with torch instead of numpy
+
+        def get_position_angle_vec(position):
+            return [position / np.power(10000, 2 * (hid_j // 2) / d_hid) for hid_j in range(d_hid)]
+
+        sinusoid_table = np.array([get_position_angle_vec(pos_i) for pos_i in range(n_position)])
+        sinusoid_table[:, 0::2] = np.sin(sinusoid_table[:, 0::2])  # dim 2i
+        sinusoid_table[:, 1::2] = np.cos(sinusoid_table[:, 1::2])  # dim 2i+1
+
+        return torch.FloatTensor(sinusoid_table).unsqueeze(0)
+
+    def forward(self, x: Tensor) -> Tensor:
+        r"""
+        x : (B, S, E) 
+        """
+        ## pos_table: (1, S, E)
+        return x + self.pos_table[:, :x.size(1)].clone().detach()
