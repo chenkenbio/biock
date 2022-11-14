@@ -26,6 +26,14 @@ FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 # if os.path.exists(os.path.join(FILE_DIR, "variables.py")):
 
 ### misc
+
+def scientific_notation(x, decimal: int=3):
+    template = "{:." + str(decimal) + "e}"
+    number, exp = template.format(x).split('e')
+    exp = int(exp)
+    return r"$%s\times 10^{%d}$" % (number, exp)
+
+
 def count_items(ar: List, sort_counts: bool=False, reverse: bool=True, fraction: bool=False):
     ar = np.asarray(ar)
     if sort_counts:
