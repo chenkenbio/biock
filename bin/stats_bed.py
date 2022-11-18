@@ -21,21 +21,29 @@ if __name__ == "__main__":
 
     starts, ends = defaultdict(list), defaultdict(list)
 
-    with copen(args.bed) as infile:
-        for l in infile:
+    if args.bed == '-':
+        for l in sys.stdin:
             if l.startswith("#"):
                 continue
             chrom, start, end = l.strip().split('\t')[0:3]
             starts[chrom].append(int(start))
             ends[chrom].append(int(end))
+    else:
+        with copen(args.bed) as infile:
+            for l in infile:
+                if l.startswith("#"):
+                    continue
+                chrom, start, end = l.strip().split('\t')[0:3]
+                starts[chrom].append(int(start))
+                ends[chrom].append(int(end))
 
     total = 0
     for chrom in starts:
         starts[chrom] = np.asarray(starts[chrom])
         ends[chrom] = np.asarray(ends[chrom])
         length = ends[chrom] - starts[chrom]
-        print("{}(n/min/mean/max/sum)\t{:,}\t{}".format(chrom, len(length), '\t'.join(["{:,}".format(x) for x in (length.min(), round(length.mean()), length.max(), length.sum())])))
+        print("{}(n/min/mean/max/sum)\t{:d}\t{}".format(chrom, len(length), '\t'.join(["{:d}".format(x) for x in (length.min(), round(length.mean()), length.max(), length.sum())])))
         total += length.sum()
-    print("total\t{:,}".format(total))
+    print("total\t{:d}".format(total))
 
 

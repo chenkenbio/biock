@@ -6,9 +6,9 @@ import sys
 from biock import gtf_to_bed
 
 def get_args():
-    p = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    p = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="Fetch information from GTF annotation")
     subparsers = p.add_subparsers(title="command", dest="command")
-    fetch = subparsers.add_parser('fetch')
+    fetch = subparsers.add_parser('fetch', description="Convert gene/transcription/exon/... annotation to BED format")
     fetch.add_argument("-i", "--input", required=True, metavar="gtf", help="GTF file")
     fetch.add_argument("-f", "--feature-type", default="all")
     fetch.add_argument("--sep", '-s', default='|', help="delimiter character")

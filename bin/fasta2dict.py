@@ -13,10 +13,13 @@ logger = logging.getLogger(__name__)
 
 
 def get_args():
-    p = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    p.add_argument('-g', "--genome", nargs='+', required=True)
+    p = argparse.ArgumentParser(
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+            description="Convert fasta to dict"
+    )
+    p.add_argument('-g', "--genome", nargs='+', required=True, help="input genome fasta file(s)")
     # p.add_argument("--gencode", action="store_true")
-    p.add_argument("--output", '-o', required=True)
+    p.add_argument("--output", '-o', required=True, help="save name")
     return p
 
 

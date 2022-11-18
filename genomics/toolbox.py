@@ -263,6 +263,10 @@ def get_reverse_strand(seq, join: bool = True, integer: bool = False):
             seq = [NN_COMPLEMENT.get(n, n) for n in seq[::-1]]
     return seq
 
+_NN_ONEHOT = np.concatenate((
+    np.ones((1, 4)) / 4,
+    np.diag(np.ones(4))
+), dtype=np.float16)
 
 class Hdf5Genome(object):
     def __init__(self, fasta) -> None:
@@ -273,21 +277,32 @@ class Hdf5Genome(object):
                 bn = fasta.replace(".fa", "")
             if os.path.exists(bn + ".h5"):
                 fasta = bn + ".h5"
+            elif os.path.exists(bn + ".fa.h5"):
+                fasta = bn + ".fa.h5"
             elif os.path.exists(bn + ".hdf5"):
                 fasta = bn + ".hdf5"
+            else:
+                raise FileNotFoundError("missing hdf5 file {}".format(fasta))
         assert os.path.exists(fasta)
         self.genome = h5py.File(fasta, 'r')
         self.number2text = np.asarray(
             ['N', 'A', 'C', 'G', 'T', 't', 'g', 'c', 'a'])
         # 0
 
-    def fetch(self, chrom: str, start: int, end: int, text=True, reverse: bool = False) -> str:
+    def fetch(self, chrom: str, start: int, end: int, text=True, reverse: bool = False, onehot: bool=False) -> str:
+        if onehot:
+            text = False
         seq = self.genome[chrom][start:end]
         if text:
             seq = ''.join(self.number2text[seq])
         if reverse:
             seq = get_reverse_strand(seq, integer=not text)
+        if onehot:
+            seq = _NN_ONEHOT[seq]
         return seq
+
+def pad_sequences(seq: np.ndarray, seq_start, seq_end, boundary_start, boundary_end, pad_ar):
+    pass
 
 
 def _counts_per_size(mtx: np.ndarray, log: bool = False, target_reads: int = 1e6) -> np.ndarray:

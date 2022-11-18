@@ -9,8 +9,9 @@ def make_logger(
         title: Optional[str]="", 
         filename: Optional[str]=None, 
         level: Literal["INFO", "DEBUG"]="INFO", 
-        filemode: Literal['w', 'a']='w',
-        show_line: bool=False):
+        mode: Literal['w', 'a']='w',
+        trace: bool=True, 
+        **kwargs):
     if isinstance(level, str):
         level = getattr(logging, level)
     logger = logging.getLogger(title)
@@ -18,7 +19,7 @@ def make_logger(
     sh = logging.StreamHandler()
     sh.setLevel(level)
 
-    if show_line:
+    if trace is True or ("show_line" in kwargs and kwargs["show_line"] is True):
         formatter = logging.Formatter(
                 '%(levelname)s(%(asctime)s) [%(filename)s:%(lineno)d]:%(message)s', datefmt='%Y%m%d %H:%M:%S'
         )
@@ -41,8 +42,8 @@ def make_logger(
             while os.path.exists("{}.conflict_{}".format(filename, suffix)):
                 suffix = "{}_1".format(suffix)
             shutil.move(filename, "{}.conflict_{}".format(filename, suffix))
-            warnings.warn("log {} exists, moved to to {}.conflict_{}".format(filename, filename, suffix))
-        fh = logging.FileHandler(filename=filename, mode=filemode)
+            warnings.warn("log {} exists, moved to to {}.conflict_{}.log".format(filename, filename, suffix))
+        fh = logging.FileHandler(filename=filename, mode=mode)
         fh.setLevel(level)
         fh.setFormatter(formatter)
         logger.addHandler(fh)
