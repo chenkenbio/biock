@@ -3,86 +3,36 @@
 import argparse, os, sys, warnings, time, json, gzip
 import numpy as np
 
-from sklearn.metrics import roc_auc_score, precision_recall_curve, auc, precision_score, recall_score, matthews_corrcoef, f1_score, average_precision_score, matthews_corrcoef
+from sklearn.metrics import (
+    roc_auc_score, average_precision_score, 
+    f1_score, matthews_corrcoef, 
+    precision_score, recall_score, accuracy_score, 
+    roc_curve, precision_recall_curve
+)
+
+from collections import OrderedDict
+import biock
+from biock import auto_open
+from biock.ml_tools import topk_acc_1d, pr_auc_score
 from scipy.stats import pearsonr, spearmanr
-
-from functools import partial
-
-def cal_aupr(y_true, y_prob):
-    precision, recall, thresholds = precision_recall_curve(y_true, y_prob)
-    aupr = auc(recall, precision)
-    return (aupr, precision, recall)
-
-
-def label_count(labels):
-    """ labels should be list,np.array """
-    categories, counts = np.unique(labels, return_counts=True)
-    ratio = (counts / counts.sum()).round(3)
-    return list(zip(categories, counts, ratio))
-
-def average_FDR_FOR(y_true, y_prob):
-    N = len(y_true)
-    y_true, y_prob = np.array(y_true).astype(int), np.array(y_prob) 
-    cutoffs = np.linspace(min(y_prob) + 1E-6, max(y_prob) - 1E-6, 1000)
-    fdr_sum = 0
-    for_sum = 0
-    for c in cutoffs:
-        pred = (y_prob >= c).astype(int)
-        FDR = np.logical_and(y_true == 0, pred == 1).sum() / np.sum(pred)
-        FOR = np.logical_and(y_true == 1, pred == 0).sum() / (N - np.sum(pred))
-        fdr_sum += FDR
-        for_sum += FOR
-    return fdr_sum / N, for_sum / N
-
-def min_FDR_FOR(y_true, y_prob):
-    N = len(y_true)
-    y_true, y_prob = np.array(y_true).astype(int), np.array(y_prob) 
-    cutoffs = np.linspace(min(y_prob) + 1E-6, max(y_prob) - 1E-6, 1000)
-    min_fdr = 10
-    min_for = 10
-    for c in cutoffs:
-        pred = (y_prob >= c).astype(int)
-        FDR = np.logical_and(y_true == 0, pred == 1).sum() / np.sum(pred)
-        FOR = np.logical_and(y_true == 1, pred == 0).sum() / (N - np.sum(pred))
-        if FDR < min_fdr:
-            min_fdr = FDR
-        if FOR < min_for:
-            min_for = FOR
-    return min_fdr, min_for
-
-def max_f1(y_true, y_prob):
-    max_f1 = -1
-    best_cutoff = None
-    for cutoff in np.linspace(min(y_prob) + 1E-6, max(y_prob) - 1E-6, 100):
-        pred = (y_prob >= cutoff).astype(int)
-        f1 = f1_score(y_true, pred)
-        if f1 > max_f1:
-            best_cutoff = cutoff
-            max_f1 = f1
-    return max_f1, best_cutoff
-            
-def max_mcc(y_true, y_prob):
-    max_mcc = -1
-    best_cutoff = None
-    for cutoff in np.linspace(min(y_prob) + 1E-6, max(y_prob) - 1E-6, 100):
-        pred = (y_prob >= cutoff).astype(int)
-        mcc = matthews_corrcoef(y_true, pred)
-        if mcc > max_mcc:
-            best_cutoff = cutoff
-            max_mcc = mcc
-    return max_mcc, best_cutoff
- 
 
 
 def get_args():
     p = argparse.ArgumentParser()
-    p.add_argument('file')
-    p.add_argument('-f', '--f1-cutoff', default=None, type=float)
-    p.add_argument('-r', action='store_true')
-    p.add_argument('--roc', action='store_true')
-    p.add_argument('--aupr', action='store_true')
-    p.add_argument('--pos', type=int, default=1)
-    p.add_argument('--neg', type=int, default=0)
+    p.add_argument('-i', '--input', help="label\tscore\t...", nargs='+')
+    p.add_argument('-t', "--task", choices=("C", "R", "classification", "regression"), help="classification(C)/regression(R) metrics", default="classification")
+    p.add_argument("-m", "--metrics", nargs='+', choices=("AUC", "AP", "F1", "topK-ACC", "PCC", "SCC", "MSE"))
+    p.add_argument('-c', '--cutoff', default=0.5, type=float, help="cutoff used in F1/MCC calculation")
+    p.add_argument('-r', "--reverse", action='store_true', help="reverse score")
+    p.add_argument("-l", "--label-column", default=0, help="column ID of label (0-start)")
+    p.add_argument("-s", "--score-column", default=1, help="column ID of score (0-start)")
+    p.add_argument("--skiprows", default=0, type=int)
+    p.add_argument("--comment", default="#", type=str)
+    p.add_argument('-d', "--delimiter", default='\t')
+    p.add_argument("--single-line", action="store_true")
+    # p.add_argument('-roc', action='store_true', help="save fpr(X)/tpr(Y) for plotting ROC curve")
+    # p.add_argument('-pr', action='store_true', help="save recall(X)/precision(Y) for plotting ROC curve")
+    p.add_argument("--f1-options", type=str, help="kwargs in f1_score")
     return p.parse_args()
 
 
@@ -91,65 +41,58 @@ if __name__ == "__main__":
 
     label, score = list(), list()
 
-    if args.file.endswith("gz"):
-        custom_open = partial(gzip.open, mode='rt')
-    else:
-        custom_open = partial(open, mode='rt')
-    with custom_open(args.file) as infile:
-        for l in infile:
-            if l.startswith('#') or len(l.strip()) == 0:
-                continue
-            l, s = l.strip().split()[0:2]
-            label.append(float(l))
-            score.append(float(s))
-    label = np.array(label)
-    score = np.array(score)
-    if len(np.unique(label)) > 2:
-        label, score = score, label
-    if args.r:
+    for fn in args.input:
+        with auto_open(fn) as infile:
+            for nr, l in enumerate(infile):
+                if nr < args.skiprows or l.startswith(args.comment):
+                    continue
+                fields = l.strip("\n").split(args.delimiter)
+                l, s = fields[args.label_column], fields[args.score_column]
+                label.append(float(l))
+                score.append(float(s))
+    label = np.asarray(label).astype(int)
+    score = np.asarray(score)
+    if args.reverse:
         score = -score
 
-    label_score = zip(list(score), list(label))
-    label_score = sorted(label_score, key=lambda l:l[0], reverse=True)
+    results = OrderedDict()
+    classification_metrics = ["AUC", "AP", "AUPR", "topK-ACC", "F1", "MCC", "precision", "recall", "ACC"]
+    if args.task == "classification" or args.task == "C":
+        assert len(np.unique(label)) == 2
+        if args.metrics is None:
+            args.metrics = classification_metrics
+        else:
+            raise NotImplementedError
+        pred = (score > args.cutoff).astype(int)
+        for m in args.metrics:
+            if m == "AUC":
+                results[m] = roc_auc_score(label, score)
+            elif m == "AP":
+                results[m] = average_precision_score(label, score)
+            elif m == "AUPR":
+                results[m] = pr_auc_score(label, score)
+            elif m == "topK-ACC":
+                results[m] = topk_acc_1d(label, score)
+            elif m == "F1":
+                results["{}(c={:g})".format(m, args.cutoff)] = f1_score(label, pred)
+            elif m == "MCC":
+                results["{}(c={:g})".format(m, args.cutoff)] = matthews_corrcoef(label, pred)
+            elif m == "precision":
+                results["{}(c={:g})".format(m, args.cutoff)] = precision_score(label, pred)
+            elif m == "recall":
+                results["{}(c={:g})".format(m, args.cutoff)] = recall_score(label, pred)
+            elif m == "ACC":
+                results["{}(c={:g})".format(m, args.cutoff)] = accuracy_score(label, pred)
+            else:
+                raise ValueError("unknown metric {}".format(m))
 
-    
-    n_pos = int(sum(label))
-    top10 = sum([a[1] for a in label_score[0:10]])     / min(n_pos, 10)
-    top100 = sum([a[1] for a in label_score[0:100]])   / min(n_pos, 100)
-    top200 = sum([a[1] for a in label_score[0:200]])   / min(n_pos, 200)
-    top500 = sum([a[1] for a in label_score[0:500]])   / min(n_pos, 500)
-    top1000 = sum([a[1] for a in label_score[0:1000]]) / min(n_pos, 1000)
-
-    AUC = roc_auc_score(label, score)
-    AP = average_precision_score(label, score)
-    AUPR = cal_aupr(label, score)[0]
-    print("# {}".format(args.file))
-    print("# label count: {}".format(label_count(label)).replace(',', ' ,').replace('(', '( ').replace(')', ' )'))
-    print("- AUC:  {:.5f}".format(AUC))
-    print("- AUPR: {:.5f}".format(AUPR))
-    print("- AP:   {:.5f}".format(AP))
-    if args.f1_cutoff is None:
-        F1, cutoff = max_f1(label, score)
-        args.f1_cutoff = cutoff
-    pred = (score > args.f1_cutoff).astype(int)
-    N = len(pred)
-    F1 = f1_score(label, pred)
-    print("\n- F1:   {:.5f} (cutoff = {:.5f})".format(F1, args.f1_cutoff).replace(')', ' )'))
-    FDR = np.logical_and(label == 0, pred == 1).sum() / np.sum(pred)
-    FOR = np.logical_and(label == 1, pred == 0).sum() / (N - np.sum(pred))
-    print(" - FDR:  {:.5f}".format(FDR))
-    print(" - FOR:  {:.5f}\n".format(FOR))
-
-    mcc, mcc_cutoff = max_mcc(label, score)
-    print("- MCC: {:.5f} (cutoff = {:.5f})\n".format(mcc, mcc_cutoff).replace(')', ' )'))
-
-    print("- Top10   ACC: {:.1f}".format(top10))
-    print("- Top100  ACC: {:.2f}".format(top100))
-    print("- Top200  ACC: {:.2f}".format(top200))
-    print("- Top500  ACC: {:.3f}".format(top500))
-    print("- Top1000 ACC: {:.3f}".format(top1000))
-
-    #mean_FDR, mean_FOR = average_FDR_FOR(label, score)
-    #print("- Average FDR: {:.5f}".format(mean_FDR))
-    #print("- Average FOR: {:.5f}".format(mean_FOR))
-
+        print(biock.get_run_info(sys.argv, args))
+        print("#label count: {}".format(biock.count_items(label)).replace(',', ' ,').replace('(', '( ').replace(')', ' )'))
+        if args.single_line:
+            print('#' + '\t'.join([x for x in results.keys()]))
+            print('\t'.join(["{:.4f}".format(x) for x in results.values()]))
+        else:
+            for m, s in results.items():
+                print("-{}:\t{:.5f}".format(m, s))
+    else:
+        raise NotImplementedError("do not support {} task".format(args.task))
