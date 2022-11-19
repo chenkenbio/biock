@@ -102,9 +102,11 @@ def str2num(s: str) -> Union[int, float]:
     return n
 
 
-def copen(input: Union[str, TextIOWrapper], mode='rt') -> TextIOWrapper:
+def auto_open(input: Union[str, TextIOWrapper], mode='rt') -> TextIOWrapper:
     if isinstance(input, str):
-        if input.endswith(".gz"):
+        if input == '-':
+            return sys.stdin
+        elif input.endswith(".gz"):
             return gzip.open(input, mode=mode)
         else:
             return open(input, mode=mode)
@@ -112,6 +114,7 @@ def copen(input: Union[str, TextIOWrapper], mode='rt') -> TextIOWrapper:
         return input
     else:
         raise IOError("Unknown input type {}".format(type(input)))
+copen = auto_open # copen: custom open
 
 
 def strip_ENS_version(ensembl_id: str) -> str:
