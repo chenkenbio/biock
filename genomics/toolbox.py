@@ -52,8 +52,8 @@ def parse_gtf_record(gtf_line: str, to_dict=False) -> GTFRecord:
         v = v.strip('"')
         if k in attrs:
             if isinstance(attrs[k], str):
-                attrs[k] = set([attrs[k]])
-            attrs[k].add(v)
+                attrs[k] = [attrs[k]]
+            attrs[k].append(v)
         else:
             attrs[k] = v
     if to_dict:
