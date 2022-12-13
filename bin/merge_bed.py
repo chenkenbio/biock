@@ -36,6 +36,8 @@ if __name__ == "__main__":
             fn = sys.stdin
         with copen(fn) as infile:
             for nr, l in enumerate(infile):
+                if l.startswith("#"):
+                    continue
                 fields = l.strip().split('\t')
                 if not args.ignore_strand:
                     chrom, start, end, _, _, strand = l.strip().split('\t')[:6]
