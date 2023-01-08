@@ -33,6 +33,31 @@ def scientific_notation(x, decimal: int=3):
     exp = int(exp)
     return r"$%s\times 10^{%d}$" % (number, exp)
 
+def count_dict_value(d: Dict[Any, int], sort=True, reverse=True, decimal=3) -> List[Tuple[Any, int, float]]:
+    total = sum(d.values())
+    ar = [(k, v, v/total) for k, v in d.items()]
+    if sort:
+        ar = sorted(ar, key=lambda x:x[1], reverse=reverse)
+    ar = [(k, v, round(f, decimal)) for k, v, f in ar]
+    return ar
+
+
+def str2dict(s: str, delimiter: str, assign_char: str='=', strip_key: str=None, strip_value: str=None) -> Dict[str, Union[str, List[str]]]:
+    d = dict()
+    for kv in s.split(delimiter):
+        k, v = kv.split(assign_char)
+        if strip_key is not None:
+            k = k.strip(strip_key)
+        if strip_value is not None:
+            v = v.strip(strip_value)
+        if k in d:
+            if not isinstance(d[k], list):
+                d[k] = [d[k]]
+            d[k].append(v)
+        else:
+            d[k] = v
+    return d
+
 
 def count_items(ar: List, sort_counts: bool=False, reverse: bool=True, fraction: bool=False):
     ar = np.asarray(ar)
@@ -58,6 +83,23 @@ def pickle_dump(obj: Any, output, compression=None, force=False):
 
 def pickle_load(obj):
     raise NotImplementedError
+
+def to_rank(x):
+    raw_idx = [t[1] for t in sorted(zip(x, np.arange(len(x))), key=lambda ar:ar[0], reverse=False)]
+    new_score = [t[1] for t in sorted(zip(raw_idx, np.arange(1, 1 + len(raw_idx))/len(raw_idx)), key=lambda ar:ar[0])]
+    return np.asarray(new_score)
+
+def string2dict(s, sep=';', assign='=') -> Dict[str, str]:
+    d = dict()
+    unknown_count = 0
+    for kv in s.split(sep):
+        try:
+            k, v = kv.split(assign)
+        except:
+            k = "unknown-key_{}".format(unknown_count)
+            unknown_count += 1
+        d[k] = v
+    return d
 
 
 def md5_file(fn):
@@ -106,7 +148,7 @@ def auto_open(input: Union[str, TextIOWrapper], mode='rt') -> TextIOWrapper:
     if isinstance(input, str):
         if input == '-':
             return sys.stdin
-        elif input.endswith(".gz"):
+        elif input.endswith(".gz") or input.endswith(".bgz"):
             return gzip.open(input, mode=mode)
         else:
             return open(input, mode=mode)
@@ -492,7 +534,7 @@ def check_args(args: Namespace, *keys):
 
 
 
-def get_run_info(argv: List[str], args: Namespace=None) -> str:
+def get_run_info(argv: List[str], args: Namespace=None, **kwargs) -> str:
     s = list()
     s.append("")
     s.append("##time: {}".format(time.asctime()))
@@ -500,6 +542,8 @@ def get_run_info(argv: List[str], args: Namespace=None) -> str:
     s.append("##cmd: {}".format(' '.join(argv)))
     if args is not None:
         s.append("##args: {}".format(args))
+    for k, v in kwargs.items():
+        s.append("##{}: {}".format(k, v))
     return '\n'.join(s)
 
 
