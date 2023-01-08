@@ -34,6 +34,8 @@ def get_formatted_metadata(metadata: str, query_string: str) -> Iterable[str]:
                 for k in keywords:
                     if isinstance(k, int):
                         meta[str(k)] = fields[k]
+                    else:
+                        meta[k] = fields[key2col[k]]
                 yield query_string.format(**meta)
 
 def get_args():
