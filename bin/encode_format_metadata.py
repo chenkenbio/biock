@@ -19,12 +19,13 @@ def get_formatted_metadata(metadata: str, query_string: str) -> Iterable[str]:
                 keys = fields.copy()
                 key2col = {k:i for i, k in enumerate(fields)}
                 missing = list()
-                for k in keywords:
+                for i, k in enumerate(keywords):
                     if k not in key2col:
                         try:
                             k = int(k)
                             if k == 0 or k > len(keys):
                                 raise ValueError("")
+                            keywords[i] = int(k)
                         except ValueError as err:
                             missing.append(k)
                 if len(missing) > 0:
