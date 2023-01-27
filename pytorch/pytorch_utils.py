@@ -6,8 +6,9 @@ import torch.nn as nn
 from torch import Tensor
 import torch.nn.functional as F
 import numpy as np
+import random
 import typing
-from typing import Literal, Optional, Tuple, List, Iterable
+from typing import Literal, Optional, Tuple, List, Iterable, Dict, Any, Callable
 import warnings
 import logging
 logger = logging.getLogger(__name__)
@@ -84,13 +85,17 @@ def kl_divergence(mu1: Tensor, logvar1: Tensor, mu2: Optional[Tensor]=None, logv
     return kl_div
 
 
-def set_seed(seed: int):
+def set_seed(seed: int, amp: bool=True, force_deterministic: bool=False):
     if float(torch.version.cuda) >= 10.2:
         os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
-    import numpy as np
+    random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
-    torch.use_deterministic_algorithms(True)
+    torch.cuda.manual_seed_all(seed)
+    if amp and not force_deterministic:
+        logger.warning("torch.use_deterministic_algorithms is not True, program will run in nondeterministic mode")
+    else:
+        torch.use_deterministic_algorithms(True)
 
 
 
@@ -155,3 +160,42 @@ def ce_focal_loss(
         loss = loss.reshape(*shape)
 
     return loss
+
+
+def get_lr_scheduler(name: str, config: Dict[str, Any]=None) -> Tuple[Callable, Dict, Dict]:
+    if config is None:
+        config = dict()
+    scheduler_params = dict()
+    control_opts = dict() # interval
+    if name.lower() in {"cosine_lr", "cosineannealinglr"}:
+        lr_scheduler_class = torch.optim.lr_scheduler.CosineAnnealingLR
+        scheduler_params["T_max"] = config.get("T_max", 64)
+        scheduler_params["eta_min"] = config.get("eta_min", 0)
+        scheduler_params["last_epoch"] = config.get("last_epoch", -1)
+        control_opts["interval"] = config.get("interval", "step")
+        control_opts["frequency"] = config.get("frequency", 1)
+        if "monitor" in config:
+            control_opts["monitor"] = config["monitor"]
+    elif name.lower() in {"plateau", "reducelronplateau"}:
+        lr_scheduler_class = torch.optim.lr_scheduler.ReduceLROnPlateau
+        scheduler_params["mode"] = config["mode"]
+        scheduler_params["factor"] = config["factor"]
+        scheduler_params["patience"] = config["patience"]
+        scheduler_params["threshold"] = config.get("threshold", 0.0001)
+        scheduler_params["min_lr"] = config.get("min_lr", 1e-9)
+        control_opts["interval"] = config.get("interval", "epoch")
+        control_opts["frequency"] = config.get("frequency", 1)
+    else:
+        lr_scheduler_class = getattr(torch.optim.lr_scheduler, name)
+        if "interval" in config:
+            control_opts["interval"] = config["interval"]
+            del config["interval"]
+        else:
+            control_opts["interval"] = "epoch"
+        if "frequency" in config:
+            control_opts["frequency"] = config["frequency"]
+            del config["frequency"]
+        else:
+            control_opts["frequency"] = 1
+        scheduler_params = config
+    return lr_scheduler_class, scheduler_params, control_opts
