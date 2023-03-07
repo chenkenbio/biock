@@ -54,16 +54,16 @@ class EasyGenome(object):
     def __repr__(self) -> str:
         return "EasyGenome(path: {}, #chroms: {})".format(self.genome_path, len(self.genome))
     
-    def fetch_sequence(self, chrom, start, end, reverse: bool=False, no_padding: bool=False, padding: Optional[str]=None, left=None, right=None) -> Union[np.ndarray, str]:
+    def fetch_sequence(self, chrom: str, start: int, end: int, reverse: bool=False, no_padding: bool=False, padding: Optional[Union[str, int]]=None, left: int=None, right: int=None) -> Union[np.ndarray, str]:
         r"""
-        chrom: chromosome name
-        start: start position, 0-based
-        end: end position, 0-based
-        reverse: reverse the sequence
-        no_padding: if True, no padding will be added
-        padding: padding character, default is 'N' for fasta, 0 for hdf5
-        left: left border, default is None(0)
-        right: right border, default is None(length of the chromosome)
+        chrom (str): chromosome name
+        start (int): start position, 0-based
+        end (int): end position, 0-based
+        reverse (bool): reverse the sequence
+        no_padding (bool): if True, no padding will be added
+        padding (int/str): padding character, default is 'N' for fasta, 0 for hdf5
+        left (int): left border, default is 0
+        right (int): right border, default is length of the chromosome
         """
         if padding is None:
             padding = self.default_padding
@@ -101,6 +101,8 @@ class EasyGenome(object):
     @classmethod
     def fasta2hdf5(cls, fasta, hdf5):
         r"""
+        fasta: fasta file path
+        hdf5: hdf5 file path (output)
         """
         genome = load_fasta(fasta)
         with h5py.File(hdf5, "w") as f:
