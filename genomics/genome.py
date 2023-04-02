@@ -65,11 +65,15 @@ class EasyGenome(object):
         left (int): left border, default is 0
         right (int): right border, default is length of the chromosome
         """
+        assert start < end, f"start {start} should be smaller than end {end}"
         if padding is None:
             padding = self.default_padding
         
         left = 0 if left is None else left
         right = len(self.genome[chrom]) if right is None else right
+        if start >= right or end <= left:
+            # warnings.warn(f"chrom {chrom} start {start} end {end} is out of range [{left}, {right})")
+            start, end = right, right + end - start
 
         left_pad, right_pad = 0, 0
         if not no_padding:
@@ -86,7 +90,7 @@ class EasyGenome(object):
             no_padding = True
 
         if self.ft == _TYPE_FASTA or self.ft == _TYPE_FASTA_GZ:
-            seq = self.genome[chrom][start:end].upper()
+            seq = self.genome[chrom][start:end]
             if not no_padding:
                 seq = padding * left_pad + seq + padding * right_pad
         else:
@@ -110,3 +114,48 @@ class EasyGenome(object):
                 seq = np.asarray(encode_sequence(seq), dtype=np.int8)
                 f.create_dataset(chrom, data=seq, dtype=np.int8)
         f.close()
+        
+
+def fetch_sequence(genome: Dict[str, np.ndarray], chrom: str, start: int, end: int, reverse: bool=False, no_padding: bool=False, padding: Optional[Union[str, int]]=None, left: int=None, right: int=None):
+    r"""
+    chrom (str): chromosome name
+    start (int): start position, 0-based
+    end (int): end position, 0-based
+    reverse (bool): reverse the sequence
+    no_padding (bool): if True, no padding will be added
+    padding (int/str): padding character, default is 'N' for fasta, 0 for hdf5
+    left (int): left border, default is 0
+    right (int): right border, default is length of the chromosome
+    """
+    if padding is None:
+        padding = ' '
+    
+    left = 0 if left is None else left
+    right = len(genome[chrom]) if right is None else right
+
+    left_pad, right_pad = 0, 0
+    if not no_padding:
+        if start < left:
+            left_pad = left - start
+            start = left
+        if end > right:
+            right_pad = end - right
+            end = right
+    else:
+        start = max(start, left)
+        end = min(end, right)
+    if left_pad + right_pad == 0:
+        no_padding = True
+
+    if self.ft == _TYPE_FASTA or self.ft == _TYPE_FASTA_GZ:
+        seq = self.genome[chrom][start:end]
+        if not no_padding:
+            seq = padding * left_pad + seq + padding * right_pad
+    else:
+        seq = self.genome[chrom][start:end]
+        if not no_padding:
+            seq = np.pad(seq, (left_pad, right_pad), constant_values=padding)
+
+    if reverse:
+        seq = get_reverse_strand(seq, integer=self.is_integer)
+    return seq
